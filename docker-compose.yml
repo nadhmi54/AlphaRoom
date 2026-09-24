@@ -1,0 +1,54 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: alpharoom-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: alpharoom
+      POSTGRES_USER: alpharoom
+      POSTGRES_PASSWORD: alpharoom
+    ports:
+      - "5433:5432"   # 5433 en local pour eviter un conflit avec un Postgres deja installe
+    volumes:
+      - alpharoom_db_data:/var/lib/postgresql/data
+    networks:
+      - alpharoom_net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: alpharoom-backend
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/alpharoom
+      SPRING_DATASOURCE_USERNAME: alpharoom
+      SPRING_DATASOURCE_PASSWORD: alpharoom
+    ports:
+      - "8080:8080"
+    networks:
+      - alpharoom_net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api
+    container_name: alpharoom-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8081:80"   # 8081 en local pour eviter un conflit avec le port 80 par defaut
+    networks:
+      - alpharoom_net
+
+networks:
+  alpharoom_net:
+    driver: bridge
+
+volumes:
+  alpharoom_db_data:
