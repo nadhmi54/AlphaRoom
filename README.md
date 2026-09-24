@@ -4,7 +4,7 @@
 
 ### Simulateur de Salle de Marché
 
-*Projet de Fin d'Études — ESPRIT — Équipe PIF*
+*Projet de Fin d'Études — ESPRIT *
 
 [![Java](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
@@ -61,7 +61,7 @@ cherche à générer, combiné à la *room* (salle de marché) — et fait aussi
 
 ## Équipe
 
-Projet réalisé par l'**Équipe PIF** :
+Projet réalisé par :
 
 | Membre |
 |---|
