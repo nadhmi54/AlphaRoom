@@ -18,6 +18,8 @@ jobs:
     name: Backend (build, tests, Sonar)
     runs-on: ubuntu-latest
     services:
+      # Base Postgres jetable pour les tests e2e (equivalent local de
+      # Supabase Postgres, sans Auth/Realtime : le job n'en a pas besoin).
       postgres:
         image: postgres:16-alpine
         env:
@@ -39,27 +41,42 @@ jobs:
         with:
           fetch-depth: 0   # necessaire pour l'analyse Sonar (blame/historique)
 
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
         with:
-          distribution: temurin
-          java-version: "21"
-          cache: maven
-          cache-dependency-path: backend/pom.xml
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
 
-      - name: Build & tests (JUnit + JaCoCo)
+      - name: Install dependencies
+        # --legacy-peer-deps : contourne un bug connu de npm/arborist declenche
+        # par la resolution des peer deps de @vitest/browser-playwright.
+        run: npm ci --legacy-peer-deps
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests with coverage
+        # --passWithNoTests : aucun module metier (donc aucun *.spec.ts) n'existe
+        # encore a ce stade ; a retirer une fois les premiers tests unitaires ajoutes.
+        run: npm run test:cov -- --passWithNoTests
+
+      - name: Build
+        run: npm run build
+
+      - name: E2E tests
         env:
-          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/alpharoom
-          SPRING_DATASOURCE_USERNAME: alpharoom
-          SPRING_DATASOURCE_PASSWORD: alpharoom
-        run: mvn -B clean verify
+          DATABASE_URL: postgresql://alpharoom:alpharoom@localhost:5432/alpharoom
+          SUPABASE_JWT_SECRET: ci-e2e-secret-not-a-real-supabase-secret-32chars
+        run: npm run test:e2e
 
       - name: SonarCloud scan
         if: env.SONAR_TOKEN != ''
+        uses: SonarSource/sonarqube-scan-action@v4
+        with:
+          projectBaseDir: backend
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: mvn -B sonar:sonar
 
   # ------------------------------------------------------------------
   frontend:

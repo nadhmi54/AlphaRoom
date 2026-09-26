@@ -1,5 +1,5 @@
-# Java / Maven
-backend/target/
+# Java / Maven (legacy backend, kept for reference)
+backend-java-legacy/target/
 *.class
 *.jar
 !.mvn/wrapper/maven-wrapper.jar
@@ -8,6 +8,16 @@ backend/target/
 frontend/node_modules/
 frontend/dist/
 frontend/coverage/
+
+# Node / backend
+backend/node_modules/
+backend/dist/
+backend/coverage/
+backend/*.tsbuildinfo
+
+# Supabase CLI local state
+supabase/.temp/
+supabase/.branches/
 
 # Env files
 .env
