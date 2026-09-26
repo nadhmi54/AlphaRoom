@@ -1,18 +1,10 @@
 services:
-  db:
-    image: postgres:16-alpine
-    container_name: alpharoom-db
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: alpharoom
-      POSTGRES_USER: alpharoom
-      POSTGRES_PASSWORD: alpharoom
-    ports:
-      - "5433:5432"   # 5433 en local pour eviter un conflit avec un Postgres deja installe
-    volumes:
-      - alpharoom_db_data:/var/lib/postgresql/data
-    networks:
-      - alpharoom_net
+  # PostgreSQL/Auth/Realtime/Storage sont maintenant fournis par Supabase :
+  #  - en local, via la CLI Supabase ("supabase start", nécessite Docker
+  #    Desktop) qui lance sa propre stack Docker séparée de ce fichier ;
+  #  - en staging/prod, via le projet Supabase hébergé.
+  # Il n'y a donc plus de service "db" ici. Voir backend/.env.example pour
+  # les variables de connexion (DATABASE_URL, SUPABASE_URL, ...).
 
   backend:
     build:
@@ -20,12 +12,8 @@ services:
       dockerfile: Dockerfile
     container_name: alpharoom-backend
     restart: unless-stopped
-    depends_on:
-      - db
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/alpharoom
-      SPRING_DATASOURCE_USERNAME: alpharoom
-      SPRING_DATASOURCE_PASSWORD: alpharoom
+    env_file:
+      - ./backend/.env
     ports:
       - "8080:8080"
     networks:
@@ -49,6 +37,3 @@ services:
 networks:
   alpharoom_net:
     driver: bridge
-
-volumes:
-  alpharoom_db_data:
