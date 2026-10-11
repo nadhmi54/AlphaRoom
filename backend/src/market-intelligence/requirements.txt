@@ -1,0 +1,12 @@
+# Module 2 - Intelligence de Marche Financiere & IA
+# Phase actuelle : pretraitement + exploration (EDA) sur XAU/USD
+pandas>=2.2
+numpy>=1.26
+scipy>=1.12
+matplotlib>=3.8
+python-dateutil>=2.9
+
+# Jupyter volontairement omis : jupyterlab casse sur Windows (chemins > 260
+# caracteres, cf. ipywidgets/galata). ipykernel suffit avec l'extension
+# Jupyter de VS Code. Si besoin d'un vrai notebook server : `pip install
+# notebook` (plus leger que jupyterlab) plutot que `jupyter`.
