@@ -1,0 +1,76 @@
+.ar-totop {
+  position: fixed;
+  right: 28px;
+  bottom: 28px;
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 58px;
+  padding: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  background: rgba(11, 17, 32, 0.82);
+  border: 1px solid rgba(217, 184, 119, 0.5);
+  backdrop-filter: blur(10px);
+  box-shadow:
+    0 12px 30px rgba(0, 0, 0, 0.5),
+    0 0 26px rgba(217, 184, 119, 0.25);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(16px) scale(0.85);
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease,
+    visibility 0.3s,
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
+}
+
+.ar-totop.is-visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+}
+
+.ar-totop img {
+  display: block;
+  object-fit: contain;
+  filter: drop-shadow(0 0 8px rgba(236, 190, 110, 0.4));
+  transition: transform 0.25s ease;
+}
+
+.ar-totop:hover,
+.ar-totop:focus-visible {
+  border-color: #d9b877;
+  box-shadow:
+    0 16px 36px rgba(0, 0, 0, 0.55),
+    0 0 40px rgba(217, 184, 119, 0.5);
+}
+
+.ar-totop:hover img,
+.ar-totop:focus-visible img {
+  transform: translateY(-3px);
+}
+
+.ar-totop:focus-visible {
+  outline: 2px solid #d9b877;
+  outline-offset: 3px;
+}
+
+@media (max-width: 720px) {
+  .ar-totop {
+    right: 16px;
+    bottom: 16px;
+    width: 52px;
+    height: 52px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ar-totop,
+  .ar-totop img {
+    transition: none;
+  }
+}
