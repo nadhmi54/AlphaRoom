@@ -1,0 +1,465 @@
+.ar-markets {
+  --ar-accent: #d9b877;
+  --ar-accent-2: #2dd4bf;
+  --ar-bg: #05070f;
+  --ar-bg-elevated: #0b1120;
+  --ar-text: #f5f5f2;
+  --ar-text-dim: #99a2b5;
+  --ar-text-faint: #6b7385;
+  --ar-green: #34d399;
+  --ar-red: #f87171;
+
+  position: relative;
+  scroll-margin-top: 72px;
+  padding: 110px 100px 100px;
+  background:
+    radial-gradient(55% 45% at 85% 0%, rgba(217, 184, 119, 0.09), transparent 70%),
+    radial-gradient(45% 40% at 5% 100%, rgba(45, 212, 191, 0.06), transparent 70%),
+    var(--ar-bg);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  color: var(--ar-text);
+}
+
+.ar-markets__inner {
+  max-width: 1240px;
+  margin: 0 auto;
+}
+
+/* ---------- heading ---------- */
+.ar-markets__head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 56px;
+}
+
+.ar-markets__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgba(45, 212, 191, 0.12);
+  border: 1px solid rgba(45, 212, 191, 0.35);
+  color: var(--ar-accent-2);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+
+.ar-markets__pill-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ar-accent-2);
+  box-shadow: 0 0 10px var(--ar-accent-2);
+}
+
+.ar-markets__title {
+  margin: 24px 0 0;
+  font-size: clamp(34px, 4.6vw, 54px);
+  line-height: 1.08;
+  font-weight: 700;
+  letter-spacing: -1.2px;
+}
+
+.ar-markets__title--accent {
+  background: linear-gradient(100deg, var(--ar-accent-2), #a7f3d0 45%, var(--ar-accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.ar-markets__lead {
+  max-width: 640px;
+  margin: 22px 0 0;
+  font-size: 17px;
+  line-height: 1.65;
+  color: var(--ar-text-dim);
+}
+
+/* ---------- tabs ---------- */
+.ar-markets__tabs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.ar-markets__tab {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  min-height: 150px;
+  padding: 0;
+  border-radius: 18px;
+  background: #070b16;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--ar-text);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  isolation: isolate;
+  transition:
+    border-color 0.25s ease,
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+/* image de fond de l'onglet */
+.ar-markets__tab-img {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(0.7) brightness(0.95);
+  transform: scale(1.001);
+  transition:
+    filter 0.35s ease,
+    transform 0.6s ease;
+}
+
+/* voile sombre pour garder le texte lisible, quelle que soit l'image */
+.ar-markets__tab::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(to top, rgba(5, 7, 15, 0.9) 0%, rgba(5, 7, 15, 0.45) 45%, rgba(5, 7, 15, 0.05) 100%),
+    linear-gradient(90deg, rgba(5, 7, 15, 0.45), transparent 70%);
+  transition: opacity 0.3s ease;
+}
+
+.ar-markets__tab:hover {
+  transform: translateY(-4px);
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.45);
+}
+
+.ar-markets__tab:hover .ar-markets__tab-img {
+  filter: saturate(0.95) brightness(0.95);
+  transform: scale(1.07);
+}
+
+.ar-markets__tab:focus-visible {
+  outline: 2px solid var(--ar-accent-2);
+  outline-offset: 3px;
+}
+
+/* onglet actif : image en couleur, liseré doré et halo */
+.ar-markets__tab[aria-selected='true'] {
+  border-color: var(--ar-accent);
+  box-shadow:
+    0 0 0 1px rgba(217, 184, 119, 0.55),
+    0 14px 40px rgba(217, 184, 119, 0.28);
+}
+
+.ar-markets__tab[aria-selected='true'] .ar-markets__tab-img {
+  filter: saturate(1.1) brightness(1);
+  transform: scale(1.05);
+}
+
+.ar-markets__tab[aria-selected='true']::before {
+  opacity: 0.8;
+}
+
+/* barre d'accent sous l'onglet actif */
+.ar-markets__tab[aria-selected='true']::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--ar-accent), var(--ar-accent-2));
+}
+
+.ar-markets__tab-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  width: 100%;
+  padding: 16px 18px 17px;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.75);
+}
+
+.ar-markets__tab-symbol {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+
+.ar-markets__tab-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #f1f3f8;
+}
+
+.ar-markets__tab-change,
+.ar-markets__change {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-weight: 600;
+}
+
+.ar-markets__tab-change {
+  margin-top: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: rgba(5, 7, 15, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  text-shadow: none;
+  backdrop-filter: blur(4px);
+}
+
+.ar-markets .is-up {
+  color: var(--ar-green);
+}
+
+.ar-markets .is-down {
+  color: var(--ar-red);
+}
+
+/* ---------- panel ---------- */
+.ar-markets__panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 28px;
+  padding: 34px;
+  border-radius: 24px;
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012) 55%),
+    var(--ar-bg-elevated);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  animation: ar-markets-in 0.35s ease both;
+}
+
+@keyframes ar-markets-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ar-markets__info {
+  display: flex;
+  flex-direction: column;
+}
+
+.ar-markets__category {
+  width: fit-content;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ar-accent);
+  background: rgba(217, 184, 119, 0.14);
+  border: 1px solid rgba(217, 184, 119, 0.32);
+}
+
+.ar-markets__asset-name {
+  margin: 18px 0 0;
+  font-size: 34px;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.8px;
+}
+
+.ar-markets__quote {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 16px;
+  margin-top: 16px;
+}
+
+.ar-markets__price {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 30px;
+  font-weight: 700;
+}
+
+.ar-markets__change {
+  font-size: 15px;
+}
+
+.ar-markets__symbol {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: var(--ar-text-faint);
+}
+
+.ar-markets__desc {
+  margin: 20px 0 0;
+  font-size: 15.5px;
+  line-height: 1.7;
+  color: var(--ar-text-dim);
+}
+
+.ar-markets__facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: auto 0 0;
+  padding-top: 26px;
+}
+
+.ar-markets__fact {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ar-markets__fact dt {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--ar-text-faint);
+}
+
+.ar-markets__fact dd {
+  margin: 6px 0 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--ar-text);
+}
+
+/* ---------- chart ---------- */
+.ar-markets__chart-card {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 18px 18px 8px;
+  border-radius: 18px;
+  background: rgba(5, 7, 15, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.ar-markets__chart-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  color: var(--ar-text-dim);
+}
+
+.ar-markets__chart-tag {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--ar-text-faint);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ar-market-chart {
+  flex: 1;
+  width: 100%;
+  min-height: 220px;
+  margin-top: 8px;
+  overflow: visible;
+}
+
+.ar-market-chart.is-up {
+  color: var(--ar-green);
+}
+
+.ar-market-chart.is-down {
+  color: var(--ar-red);
+}
+
+.ar-market-chart__grid {
+  stroke: rgba(255, 255, 255, 0.07);
+  stroke-width: 1;
+  stroke-dasharray: 4 6;
+  vector-effect: non-scaling-stroke;
+}
+
+.ar-market-chart__line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 6px currentColor);
+}
+
+.ar-markets__note {
+  margin: 20px 0 0;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--ar-text-faint);
+}
+
+/* ---------- responsive ---------- */
+@media (max-width: 1180px) {
+  .ar-markets {
+    padding: 90px 48px 90px;
+  }
+  .ar-markets__tabs {
+    grid-template-columns: repeat(5, minmax(150px, 1fr));
+    overflow-x: auto;
+    padding-bottom: 6px;
+  }
+  .ar-markets__panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .ar-markets {
+    padding: 72px 20px 72px;
+  }
+  .ar-markets__head {
+    margin-bottom: 40px;
+  }
+  .ar-markets__panel {
+    padding: 22px 18px;
+  }
+  .ar-markets__asset-name {
+    font-size: 28px;
+  }
+  .ar-markets__facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ar-market-chart {
+    min-height: 180px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ar-markets__tab,
+  .ar-markets__tab-img,
+  .ar-markets__panel {
+    transition: none;
+    animation: none;
+  }
+  .ar-markets__tab:hover,
+  .ar-markets__tab:hover .ar-markets__tab-img,
+  .ar-markets__tab[aria-selected='true'] .ar-markets__tab-img {
+    transform: none;
+  }
+}

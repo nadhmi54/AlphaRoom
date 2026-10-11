@@ -36,3 +36,13 @@ Thumbs.db
 
 # Sonar
 .scannerwork/
+
+# Module 2 - Intelligence de Marché & IA (Python)
+backend/market-intelligence/.venv/
+backend/market-intelligence/data/raw/*
+!backend/market-intelligence/data/raw/.gitkeep
+backend/market-intelligence/data/processed/*
+!backend/market-intelligence/data/processed/.gitkeep
+backend/market-intelligence/__pycache__/
+backend/market-intelligence/**/__pycache__/
+backend/market-intelligence/.ipynb_checkpoints/

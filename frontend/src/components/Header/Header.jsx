@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+import UserMenu from './UserMenu.jsx';
 import './Header.css';
 import { TICKER_ITEMS } from '../../data/marketTicker.js';
 
@@ -24,8 +26,14 @@ export default function Header() {
       <div className="ar-header__inner">
         <nav className="ar-nav">
           <a href="#top" className="ar-nav__brand">
-            <span className="ar-nav__mark" aria-hidden="true" />
-            <span>AlphaRoom</span>
+            <img
+              src="/images/alpharoom-logo.png"
+              alt=""
+              width="46"
+              height="46"
+              className="ar-nav__logo"
+            />
+            <span className="ar-nav__brand-text">AlphaRoom</span>
           </a>
           <div className="ar-nav__links">
             <a href="#markets">Marchés</a>
@@ -34,8 +42,7 @@ export default function Header() {
             <a href="#team">Équipe</a>
           </div>
           <div className="ar-nav__actions">
-            <button type="button" className="ar-btn ar-btn--ghost">Se connecter</button>
-            <button type="button" className="ar-btn ar-btn--primary">Essai gratuit</button>
+            <UserMenu />
           </div>
         </nav>
 
@@ -74,7 +81,7 @@ export default function Header() {
             </p>
 
             <div className="ar-hero__cta">
-              <button type="button" className="ar-btn ar-btn--primary">Démarrer la simulation →</button>
+              <Link to="/inscription" className="ar-btn ar-btn--primary">Démarrer la simulation →</Link>
               <a href="#features" className="ar-btn ar-btn--ghost">Voir les modules</a>
             </div>
 

@@ -142,6 +142,7 @@
   backdrop-filter: blur(16px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   position: relative;
+  z-index: 10; /* au-dessus du bandeau de cotations, pour le menu du compte */
 }
 
 .ar-nav::after {
@@ -164,15 +165,22 @@
   letter-spacing: -0.2px;
 }
 
-.ar-nav__mark {
-  width: 36px;
-  height: 36px;
-  border-radius: 11px;
-  background: radial-gradient(circle at 32% 26%, #fff6df, var(--ar-accent) 52%, #6b5122 100%);
-  box-shadow:
-    inset 0 2px 3px rgba(255, 255, 255, 0.6),
-    inset 0 -6px 10px rgba(0, 0, 0, 0.35),
-    0 6px 18px rgba(217, 184, 119, 0.5);
+/* Logo AlphaRoom (version claire pour fond sombre) */
+.ar-nav__logo {
+  width: 46px;
+  height: 46px;
+  display: block;
+  object-fit: contain;
+  filter: drop-shadow(0 0 10px rgba(236, 190, 110, 0.35));
+}
+
+/* Nom de la marque : toujours bien lisible sur fond sombre */
+.ar-nav__brand-text {
+  color: #f5f5f0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  -webkit-text-fill-color: #f5f5f0;
 }
 
 .ar-nav__links {
@@ -213,6 +221,105 @@
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+/* bouton de connexion : icône utilisateur */
+.ar-nav__user {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  color: var(--ar-text);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(10px);
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.ar-usermenu {
+  position: relative;
+}
+
+.ar-nav__user {
+  cursor: pointer;
+  padding: 0;
+}
+
+.ar-nav__user.is-open,
+.ar-nav__user:hover,
+.ar-nav__user:focus-visible {
+  color: var(--ar-accent);
+  border-color: var(--ar-accent);
+  box-shadow: 0 0 22px rgba(212, 176, 106, 0.35);
+  transform: translateY(-2px);
+}
+
+.ar-nav__user:focus-visible {
+  outline: 2px solid var(--ar-accent);
+  outline-offset: 3px;
+}
+
+.ar-usermenu__panel {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  z-index: 20;
+  min-width: 190px;
+  padding: 8px;
+  border-radius: 16px;
+  background: rgba(11, 17, 32, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(16px);
+  animation: ar-usermenu-in 0.18s ease both;
+}
+
+@keyframes ar-usermenu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ar-usermenu .ar-usermenu__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ar-text);
+  transition:
+    background 0.18s ease,
+    color 0.18s ease;
+}
+
+.ar-usermenu .ar-usermenu__item:hover,
+.ar-usermenu .ar-usermenu__item:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ar-accent);
+  outline: none;
+}
+
+.ar-usermenu .ar-usermenu__item--accent {
+  color: var(--ar-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ar-usermenu__panel {
+    animation: none;
+  }
 }
 
 /* buttons */
