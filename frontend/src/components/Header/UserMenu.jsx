@@ -1,10 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/useAuth.js';
+import { roleLabel } from '../../data/roles.js';
+import { initialsOf } from '../../utils/initials.js';
 
 // Icône utilisateur de la barre de navigation : ouvre un petit menu pour
 // choisir entre se connecter et créer un compte.
 export default function UserMenu() {
+  const { session, profile, signOut } = useAuth();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [brokenAvatar, setBrokenAvatar] = useState(null);
   const rootRef = useRef(null);
 
   useEffect(() => {
@@ -24,6 +30,63 @@ export default function UserMenu() {
       document.removeEventListener('keydown', onKeyDown);
     };
   }, [open]);
+
+  if (session) {
+    const displayName = profile?.fullName || profile?.username || session.user?.email || 'Mon compte';
+    const initials = initialsOf(displayName);
+
+    const handleSignOut = async () => {
+      setOpen(false);
+      await signOut();
+      navigate('/');
+    };
+
+    return (
+      <div className="ar-usermenu" ref={rootRef}>
+        <button
+          type="button"
+          className={`ar-nav__user ar-nav__user--signed ${open ? 'is-open' : ''}`}
+          aria-label="Compte"
+          aria-haspopup="menu"
+          aria-expanded={open}
+          onClick={() => setOpen((value) => !value)}
+        >
+          {profile?.avatarUrl && profile.avatarUrl !== brokenAvatar ? (
+            <img
+              className="ar-usermenu__avatar"
+              src={profile.avatarUrl}
+              alt=""
+              onError={() => setBrokenAvatar(profile.avatarUrl)}
+            />
+          ) : (
+            <span className="ar-usermenu__initials" aria-hidden="true">
+              {initials}
+            </span>
+          )}
+        </button>
+
+        {open && (
+          <div className="ar-usermenu__panel" role="menu" aria-label="Compte">
+            <div className="ar-usermenu__who">
+              <strong>{displayName}</strong>
+              {profile && <span>{roleLabel(profile.role)}</span>}
+            </div>
+            <Link to="/profil" className="ar-usermenu__item" role="menuitem" onClick={() => setOpen(false)}>
+              Mon profil
+            </Link>
+            {profile?.role === 'admin' && (
+              <Link to="/admin/utilisateurs" className="ar-usermenu__item" role="menuitem" onClick={() => setOpen(false)}>
+                Administration
+              </Link>
+            )}
+            <button type="button" className="ar-usermenu__item ar-usermenu__item--button" role="menuitem" onClick={handleSignOut}>
+              Se déconnecter
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="ar-usermenu" ref={rootRef}>

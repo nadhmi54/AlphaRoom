@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import AuthLayout from '../../components/AuthLayout/AuthLayout.jsx';
 import PasswordInput from '../../components/PasswordInput/PasswordInput.jsx';
 import GoogleIcon from '../../components/icons/GoogleIcon.jsx';
@@ -9,6 +9,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function SignInPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(true);
@@ -33,7 +34,7 @@ export default function SignInPage() {
     setLoading(true);
     try {
       await signInWithEmail(email, password);
-      navigate('/');
+      navigate(location.state?.from || '/', { replace: true });
     } catch (err) {
       setBanner({ type: 'error', text: err.message || 'Connexion impossible.' });
     } finally {
