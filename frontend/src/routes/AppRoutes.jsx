@@ -3,6 +3,7 @@ import { Routes, Route } from 'react-router-dom';
 import HomePage from '../pages/Home/HomePage.jsx';
 import LoadingScreen from '../components/LoadingScreen/LoadingScreen.jsx';
 import RouteLoader from '../components/RouteLoader/RouteLoader.jsx';
+import ProtectedRoute from './ProtectedRoute.jsx';
 
 // Chargées à la demande (et non importées en haut du fichier) : ainsi, si une
 // de ces pages (ou une de ses dépendances, ex. la config Supabase) a un
@@ -10,6 +11,8 @@ import RouteLoader from '../components/RouteLoader/RouteLoader.jsx';
 // normalement au lieu d'une page blanche pour toute l'app.
 const SignInPage = lazy(() => import('../pages/SignIn/SignInPage.jsx'));
 const SignUpPage = lazy(() => import('../pages/SignUp/SignUpPage.jsx'));
+const ProfilePage = lazy(() => import('../pages/Profile/ProfilePage.jsx'));
+const AdminUsersPage = lazy(() => import('../pages/Admin/AdminUsersPage.jsx'));
 
 // Un module = une page = un dossier dans src/pages/Modules/ (une équipe par module).
 const M1MarchePage = lazy(() => import('../pages/Modules/M1Marche/M1MarchePage.jsx'));
@@ -23,6 +26,8 @@ const M6ActuariatPage = lazy(() => import('../pages/Modules/M6Actuariat/M6Actuar
 const PAGES = [
   { path: '/connexion', Page: SignInPage },
   { path: '/inscription', Page: SignUpPage },
+  { path: '/profil', Page: ProfilePage, protect: true },
+  { path: '/admin/utilisateurs', Page: AdminUsersPage, protect: true, roles: ['admin'] },
   { path: '/marche', Page: M1MarchePage },
   { path: '/intelligence-ia', Page: M2IntelligenceIAPage },
   { path: '/formation', Page: M3FormationPage },
@@ -41,13 +46,19 @@ export default function AppRoutes() {
       <RouteLoader />
       <Routes>
         <Route path="/" element={<HomePage />} />
-        {PAGES.map(({ path, Page }) => (
+        {PAGES.map(({ path, Page, protect, roles }) => (
           <Route
             key={path}
             path={path}
             element={
               <Suspense fallback={<LoadingScreen layer="under" />}>
-                <Page />
+                {protect ? (
+                  <ProtectedRoute roles={roles}>
+                    <Page />
+                  </ProtectedRoute>
+                ) : (
+                  <Page />
+                )}
               </Suspense>
             }
           />

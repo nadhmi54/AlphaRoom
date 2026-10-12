@@ -1,0 +1,98 @@
+.ar-adm__tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.ar-adm__tabs button {
+  padding: 9px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #99a2b5;
+  cursor: pointer;
+}
+
+.ar-adm__tabs button.is-active {
+  color: #1a1305;
+  background: #d9b877;
+  border-color: #d9b877;
+}
+
+.ar-adm__filters {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr)) auto;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.ar-adm__tablewrap {
+  overflow-x: auto;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.ar-adm__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.ar-adm__table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: #6b7385;
+  white-space: nowrap;
+}
+
+.ar-adm__table td {
+  padding: 12px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  vertical-align: middle;
+  color: #d5dae5;
+}
+
+.ar-adm__table td strong {
+  display: block;
+  color: #f5f5f2;
+}
+
+.ar-adm__sub {
+  font-size: 12px;
+  color: #8a93a6;
+}
+
+.ar-adm__select {
+  min-width: 150px;
+  padding: 8px 10px;
+}
+
+.ar-adm__empty {
+  text-align: center;
+  color: #6b7385;
+}
+
+.ar-adm__pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  font-size: 13px;
+  color: #99a2b5;
+}
+
+@media (max-width: 720px) {
+  .ar-adm__filters {
+    grid-template-columns: 1fr;
+  }
+}
