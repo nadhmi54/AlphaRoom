@@ -135,6 +135,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Docker/GHCR refusent les majuscules dans un nom d'image : le depot
+      # s'appelle "AlphaRoom", on passe donc le nom en minuscules.
+      - name: Noms d'images en minuscules
+        run: |
+          echo "IMG_BACKEND=${GITHUB_REPOSITORY,,}-backend" >> "$GITHUB_ENV"
+          echo "IMG_FRONTEND=${GITHUB_REPOSITORY,,}-frontend" >> "$GITHUB_ENV"
+
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -148,8 +155,8 @@ jobs:
           context: ./backend
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BACKEND }}:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BACKEND }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMG_BACKEND }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMG_BACKEND }}:${{ github.sha }}
 
       - name: Build & push frontend image
         uses: docker/build-push-action@v6
@@ -157,8 +164,8 @@ jobs:
           context: ./frontend
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_FRONTEND }}:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_FRONTEND }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMG_FRONTEND }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMG_FRONTEND }}:${{ github.sha }}
 
   # ------------------------------------------------------------------
   deploy:
