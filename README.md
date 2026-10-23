@@ -11,7 +11,7 @@
 [![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Supabase](https://img.shields.io/badge/Supabase-Postgres%20%7C%20Auth-3FCF8E?logo=supabase&logoColor=white)](https://supabase.com/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![GitHub Actions](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?logo=githubactions&logoColor=white)](https://github.com/features/actions)
 [![SonarCloud](https://img.shields.io/badge/Code%20Quality-SonarCloud-F3702A?logo=sonarcloud&logoColor=white)](https://sonarcloud.io/)
@@ -404,7 +404,7 @@ tests, analyse Sonar, images Docker, déploiement).
 |---|---|
 | Backend | Node.js 20, NestJS 12, TypeORM |
 | Frontend | React 18, Vite, ESLint, Vitest + Testing Library |
-| Backend-as-a-Service | **Supabase** (PostgreSQL 16 managé, Auth, Realtime) — via la CLI en local, projet hébergé en staging/prod |
+| Backend-as-a-Service | **Supabase** (PostgreSQL 17 managé, Auth, Realtime) — via la CLI en local, projet hébergé en staging/prod |
 | Conteneurisation | Docker (multi-stage), Docker Compose (backend + frontend) |
 | Serveur web / reverse proxy | Nginx |
 | CI/CD | GitHub Actions |
@@ -453,7 +453,7 @@ git clone https://github.com/nadhmi54/AlphaRoom.git
 cd AlphaRoom
 
 # 1. Démarrer Supabase en local (Postgres + Auth + Realtime)
-npx supabase start
+supabase start
 
 # 2. Configurer le backend (les valeurs par défaut de .env.example
 #    correspondent déjà à la stack Supabase locale)
@@ -480,9 +480,9 @@ hébergé en staging/production.
 ### Lancer la stack Supabase locale
 
 ```bash
-npx supabase start   # première fois : télécharge les images Docker (peut prendre quelques minutes)
-npx supabase status  # ré-affiche les URLs et clés locales
-npx supabase stop    # arrêter la stack Supabase locale
+supabase start   # première fois : télécharge les images Docker (peut prendre quelques minutes)
+supabase status  # ré-affiche les URLs et clés locales
+supabase stop    # arrêter la stack Supabase locale
 ```
 
 La commande affiche les URLs/clés locales (Postgres sur le port `54322`, API sur
@@ -524,7 +524,7 @@ docker compose build frontend
 
 ### Se connecter à la base de données
 
-- **En local** : `npx supabase status` affiche l'URL de connexion directe à Postgres
+- **En local** : `supabase status` affiche l'URL de connexion directe à Postgres
   (`postgresql://postgres:postgres@localhost:54322/postgres` par défaut), ou utilise
   **Supabase Studio** (http://localhost:54323) pour une interface graphique.
 - **En staging/production** : identifiants disponibles dans *Project Settings → API* du
@@ -620,12 +620,7 @@ Le fichier `.github/workflows/ci.yml` définit 4 jobs, déclenchés sur chaque `
 | `docker` | Build et push des images backend/frontend vers GHCR (uniquement sur push vers `main`, après succès des jobs précédents) |
 | `deploy` | Déploiement SSH + `docker compose` vers l'environnement de production (déclenchement manuel, protégé par un environnement GitHub avec approbation) |
 
-> ⚠️ **En cours de migration** : le job `backend` du pipeline (`ci.yml`) exécute encore la
-> chaîne Maven/JUnit/JaCoCo héritée de l'ancien backend Java. Il doit être mis à jour pour
-> builder/tester/linter le nouveau backend NestJS (Node.js/npm, Vitest, oxlint) sur le même
-> modèle que le job `frontend`.
-
-## Gouvernance & sécurité
+## Gouvernance & sécurité & sécurité
 
 - **Branch protection** sur `main` : Pull Request obligatoire (1 approbation minimum),
   résolution des conversations requise, status checks CI obligatoires, force-push et
