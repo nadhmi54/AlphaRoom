@@ -6,10 +6,7 @@
  */
 export enum UserRole {
   TRADER = 'trader',
-  ANALYST = 'analyst',
-  TRAINER = 'trainer',
   GAME_MASTER = 'game_master',
-  RISK_MANAGER = 'risk_manager',
   ADMIN = 'admin',
 }
 

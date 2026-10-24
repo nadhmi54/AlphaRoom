@@ -50,8 +50,8 @@ describe('RolesGuard', () => {
   });
 
   it('autorise un rôle requis, refuse les autres (admin non implicite)', () => {
-    const g = guardFor([UserRole.RISK_MANAGER]);
-    expect(g.canActivate(ctx({ profile: profile({ role: UserRole.RISK_MANAGER }) }))).toBe(true);
+    const g = guardFor([UserRole.GAME_MASTER]);
+    expect(g.canActivate(ctx({ profile: profile({ role: UserRole.GAME_MASTER }) }))).toBe(true);
     expect(() => g.canActivate(ctx({ profile: profile({ role: UserRole.TRADER }) }))).toThrow(
       ForbiddenException,
     );

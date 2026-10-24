@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const getSession = vi.fn();
 vi.mock('../config/supabaseClient.js', () => ({ supabase: { auth: { getSession } } }));
+vi.mock('../config/env.js', () => ({ API_URL: '/api' }));
 
 const { apiFetch, ApiError } = await import('./apiClient.js');
 

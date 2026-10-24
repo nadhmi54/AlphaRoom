@@ -164,14 +164,14 @@ describe('UsersService administration', () => {
   it('change le rôle et écrit une entrée dans le journal', async () => {
     const { service, profiles, audit } = setup();
     profiles.findOneBy.mockResolvedValue(makeProfile());
-    const p = await service.changeRole(actor, targetId, UserRole.RISK_MANAGER);
-    expect(p.role).toBe(UserRole.RISK_MANAGER);
+    const p = await service.changeRole(actor, targetId, UserRole.GAME_MASTER);
+    expect(p.role).toBe(UserRole.GAME_MASTER);
     expect(audit.save).toHaveBeenCalledWith(
       expect.objectContaining({
         actorId: actor,
         targetId,
         action: 'role_changed',
-        details: { from: UserRole.TRADER, to: UserRole.RISK_MANAGER },
+        details: { from: UserRole.TRADER, to: UserRole.GAME_MASTER },
       }),
     );
   });
@@ -198,8 +198,8 @@ describe('UsersService administration', () => {
   it("autorise la rétrogradation d'un admin s'il en reste un autre", async () => {
     const { service, profiles } = setup(1);
     profiles.findOneBy.mockResolvedValue(makeProfile({ role: UserRole.ADMIN }));
-    const p = await service.changeRole(actor, targetId, UserRole.ANALYST);
-    expect(p.role).toBe(UserRole.ANALYST);
+    const p = await service.changeRole(actor, targetId, UserRole.TRADER);
+    expect(p.role).toBe(UserRole.TRADER);
   });
 
   it('désactive / réactive un compte avec journal, et ignore les no-op', async () => {
