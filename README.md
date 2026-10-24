@@ -404,7 +404,7 @@ tests, analyse Sonar, images Docker, déploiement).
 |---|---|
 | Backend | Node.js 20, NestJS 12, TypeORM |
 | Frontend | React 18, Vite, ESLint, Vitest + Testing Library |
-| Backend-as-a-Service | **Supabase** (PostgreSQL 17 managé, Auth, Realtime) — via la CLI en local, projet hébergé en staging/prod |
+| Backend-as-a-Service | **Supabase Cloud** (PostgreSQL 17 managé, Auth, Realtime) |
 | Conteneurisation | Docker (multi-stage), Docker Compose (backend + frontend) |
 | Serveur web / reverse proxy | Nginx |
 | CI/CD | GitHub Actions |
@@ -436,7 +436,8 @@ AlphaRoom/
 │   ├── nginx.conf
 │   └── sonar-project.properties
 ├── supabase/
-│   └── config.toml             # Configuration de la stack Supabase locale (CLI)
+│   ├── config.toml             # Configuration Supabase CLI (migrations)
+│   └── migrations/             # Migrations à appliquer au projet Supabase Cloud
 ├── docker-compose.yml          # Environnement local : backend + frontend
 ├── new-push.sh / new-push.bat  # Crée une branche, commit initial, push
 ├── update.sh / update.bat      # Bascule sur main et récupère les derniers changements
@@ -445,19 +446,19 @@ AlphaRoom/
 
 ## Démarrage rapide
 
-**Prérequis :** Docker Desktop installé et lancé (pour le backend/frontend et pour la
-stack Supabase locale).
+**Prérequis :** Docker Desktop installé et lancé, un projet Supabase Cloud et ses
+informations d'accès (URL, clé publique et chaîne de connexion PostgreSQL).
 
 ```bash
 git clone https://github.com/nadhmi54/AlphaRoom.git
 cd AlphaRoom
 
-# 1. Démarrer Supabase en local (Postgres + Auth + Realtime)
-supabase start
-
-# 2. Configurer le backend (les valeurs par défaut de .env.example
-#    correspondent déjà à la stack Supabase locale)
+# 1. Configurer le backend avec les informations du projet Supabase Cloud
 cp backend/.env.example backend/.env
+# Renseigner DATABASE_URL, SUPABASE_URL et SUPABASE_JWT_SECRET dans backend/.env
+
+# 2. Créer un fichier .env à la racine et y renseigner les variables
+#    VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY (voir ci-dessous)
 
 # 3. Démarrer le backend + le frontend
 docker compose up --build
@@ -465,29 +466,46 @@ docker compose up --build
 
 - Frontend : http://localhost:8081
 - Backend (health check) : http://localhost:8080/api/health
-- Supabase Studio (admin base de données / auth, local) : http://localhost:54323
+- Supabase Dashboard (base de données et Auth) : https://supabase.com/dashboard
 
 ## Docker & Supabase
 
-Depuis le passage à Supabase, **PostgreSQL, l'authentification et le realtime ne sont plus
-gérés par un conteneur `db` custom** dans `docker-compose.yml` : ils sont fournis par
-Supabase, soit via sa propre stack Docker locale (CLI), soit via un projet Supabase
-hébergé en staging/production.
+**PostgreSQL, l'authentification et le realtime ne sont pas gérés par un conteneur `db`
+dans `docker-compose.yml`** : ils sont fournis par le projet **Supabase Cloud** utilisé
+par l'application. Il n'est pas nécessaire de démarrer la stack Supabase CLI en local.
 
 `docker-compose.yml` orchestre donc uniquement les deux services applicatifs :
-`backend` (NestJS) et `frontend` (React servi par Nginx).
+`backend` (NestJS) et `frontend` (React servi par Nginx), qui se connectent au projet
+Supabase hébergé.
 
-### Lancer la stack Supabase locale
+### Configurer Supabase Cloud
 
-```bash
-supabase start   # première fois : télécharge les images Docker (peut prendre quelques minutes)
-supabase status  # ré-affiche les URLs et clés locales
-supabase stop    # arrêter la stack Supabase locale
-```
+1. Créer ou sélectionner le projet dans [Supabase Dashboard](https://supabase.com/dashboard).
+2. Dans **Project Settings → API**, récupérer l'URL du projet, la clé publique
+   (`anon` / publishable key) et le secret JWT utilisé par le backend.
+3. Dans **Connect**, récupérer la chaîne de connexion PostgreSQL du projet et y
+   renseigner le mot de passe de la base.
+4. Copier `backend/.env.example` vers `backend/.env`, puis renseigner :
 
-La commande affiche les URLs/clés locales (Postgres sur le port `54322`, API sur
-`54321`, Studio sur `54323`) — elles correspondent déjà aux valeurs par défaut de
-`backend/.env.example`.
+   - `DATABASE_URL` : chaîne de connexion PostgreSQL Supabase.
+   - `SUPABASE_URL` : URL HTTPS du projet, par exemple
+     `https://<project-ref>.supabase.co`.
+   - `SUPABASE_JWT_SECRET` : secret JWT du projet.
+5. Créer un fichier `.env` à la racine du dépôt pour le build Docker du frontend :
+
+   ```dotenv
+   VITE_SUPABASE_URL=https://<project-ref>.supabase.co
+   VITE_SUPABASE_ANON_KEY=<cle-publique-du-projet>
+   ```
+
+La clé `anon`/publishable est publique et destinée au frontend. **Ne jamais** placer la
+clé `service_role` ou le mot de passe PostgreSQL dans le fichier `.env` racine, dans le
+frontend ou dans le dépôt. Les fichiers `.env` doivent rester privés et ne pas être
+commités.
+
+Les migrations du dépôt se trouvent dans `supabase/migrations/`. Les appliquer au projet
+Cloud avant d'utiliser les fonctionnalités qui dépendent de ces tables, avec la CLI
+Supabase liée au projet ou via les outils SQL du Dashboard.
 
 ### Lancer le backend et le frontend
 
@@ -522,18 +540,11 @@ docker compose build backend
 docker compose build frontend
 ```
 
-### Se connecter à la base de données
+### Accès à la base de données
 
-- **En local** : `supabase status` affiche l'URL de connexion directe à Postgres
-  (`postgresql://postgres:postgres@localhost:54322/postgres` par défaut), ou utilise
-  **Supabase Studio** (http://localhost:54323) pour une interface graphique.
-- **En staging/production** : identifiants disponibles dans *Project Settings → API* du
-  tableau de bord Supabase du projet — jamais commités, voir `backend/.env.example`.
-
-> ⚠️ Le backend tournant à l'intérieur d'un conteneur Docker ne peut pas joindre la stack
-> Supabase locale via `localhost` (qui, dans le conteneur, désigne le conteneur
-> lui-même) : utiliser `host.docker.internal` à la place. Voir les commentaires dans
-> `backend/.env.example`.
+La base PostgreSQL est accessible via la chaîne de connexion du projet Supabase Cloud.
+Pour consulter les données et gérer Auth, utiliser le Dashboard Supabase du projet.
+Les informations de connexion sont sensibles : ne pas les partager ni les commiter.
 
 ### Relancer le backend seul après une modification
 
