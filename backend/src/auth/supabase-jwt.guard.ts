@@ -58,7 +58,12 @@ export class SupabaseJwtGuard implements CanActivate {
     const { alg } = decodeProtectedHeader(token);
 
     if (alg === 'HS256') {
-      const secret = this.config.get<string>('SUPABASE_JWT_SECRET')!;
+      const secret = this.config.get<string>('SUPABASE_JWT_SECRET');
+      if (!secret) {
+        throw new Error(
+          'SUPABASE_JWT_SECRET est requis pour vérifier les jetons HS256.',
+        );
+      }
       return jwt.verify(token, secret, { algorithms: ['HS256'] }) as SupabaseJwtPayload;
     }
 

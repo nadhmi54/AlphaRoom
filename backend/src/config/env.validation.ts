@@ -19,9 +19,11 @@ class EnvironmentVariables {
 
   // Verifies JWTs issued by Supabase Auth (Project Settings > API > JWT Secret,
   // or printed by `supabase start` for local dev).
+  // Required only for projects that still sign access tokens with HS256.
+  // Asymmetric Supabase signing keys are verified through SUPABASE_URL/JWKS.
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  SUPABASE_JWT_SECRET!: string;
+  SUPABASE_JWT_SECRET?: string;
 
   @IsOptional()
   @IsString()
