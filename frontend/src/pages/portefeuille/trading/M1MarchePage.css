@@ -198,6 +198,9 @@
 }
 .m1-stat small,
 .m1-order-note {
+  display: block;
+  margin-top: 10px;
+  line-height: 1.5;
   color: #727d91;
   font-size: 11px;
 }
@@ -207,12 +210,8 @@
 .is-negative {
   color: #fa777d !important;
 }
-.m1-workspace {
-  display: grid;
-  grid-template-columns: minmax(280px, 0.75fr) minmax(0, 1.5fr);
-  gap: 14px;
-  align-items: start;
-}
+/* Le carnet d'ordres est passé pleine largeur : le panneau OrderBookPanel
+   apporte sa propre mise en page (ob-…). */
 .m1-card-heading {
   display: flex;
   justify-content: space-between;
@@ -229,29 +228,6 @@
     monospace;
   color: #818b9e;
   margin-left: 5px;
-}
-.m1-price {
-  display: block;
-  font:
-    600 clamp(30px, 4vw, 42px) "JetBrains Mono",
-    monospace;
-  letter-spacing: -2px;
-  margin: 28px 0 5px;
-}
-.m1-quote > p {
-  font-size: 12px;
-  color: #99a2b5;
-  margin: 0 0 17px;
-}
-.m1-quote > small {
-  font-size: 10px;
-  color: #727d91;
-}
-.m1-order-note {
-  display: block;
-  text-align: center;
-  margin-top: 10px;
-  line-height: 1.5;
 }
 .m1-lower-grid {
   display: grid;
@@ -315,14 +291,6 @@
 .m1-summary--stats {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
-.m1-select-label {
-  display: block;
-  margin-top: 8px;
-  color: #cbd0db;
-  font-size: 14px;
-  font-weight: 600;
-}
-.m1-select,
 .m1-filters select,
 .m1-filters input {
   box-sizing: border-box;
@@ -334,14 +302,6 @@
   padding: 9px 11px;
   font: inherit;
   color-scheme: dark;
-}
-.m1-select {
-  width: 100%;
-  margin-top: 18px;
-}
-.m1-chart-card h3 {
-  margin: 6px 0 0;
-  font-size: 17px;
 }
 .m1-chart-wrap {
   margin-top: 20px;
@@ -450,9 +410,6 @@
   }
   .m1-filters {
     grid-template-columns: 1fr 1fr;
-  }
-  .m1-workspace {
-    grid-template-columns: 1fr;
   }
   .m1-card {
     padding: 16px;

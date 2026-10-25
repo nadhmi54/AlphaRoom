@@ -94,7 +94,6 @@ export default function M1MarchePage() {
   // relancer à chaque mise à jour (sinon l'intervalle repartirait sans cesse).
   const hasAccount = useRef(false);
 
-  const quote = assets.find((asset) => asset.symbol === selectedSymbol);
   const assetBySymbol = useMemo(
     () => new Map(assets.map((asset) => [asset.symbol, asset])),
     [assets],
@@ -313,40 +312,17 @@ export default function M1MarchePage() {
           </article>
         </div>
 
-        <div className="m1-workspace">
-          <article className="m1-card m1-quote">
-            <div className="m1-card-heading">
-              <div>
-                <span className="m1-eyebrow">ACTIFS SIMULÉS</span>
-                <label className="m1-select-label" htmlFor="m1-asset">Choisir un actif</label>
-              </div>
-              <span className="m1-tag">Dernier prix exécuté</span>
-            </div>
-            <select
-              id="m1-asset"
-              className="m1-select"
-              value={selectedSymbol}
-              onChange={(event) => setSelectedSymbol(event.target.value)}
-              disabled={!assets.length}
-            >
-              {assets.map((asset) => (
-                <option key={asset.symbol} value={asset.symbol}>{asset.name} · {asset.symbol}</option>
-              ))}
-            </select>
-            <strong className="m1-price">{quote ? money(quote.price) : "—"}</strong>
-            <p>{quote ? `${quote.symbol} · ${quote.category} · unité : ${quote.unit}` : "Chargement des actifs…"}</p>
-            <small>Prix fixés par le carnet d’ordres simulé, sans flux réel.</small>
-          </article>
-
-          {/* Carnet d'ordres (moteur d'exécution de M1) : composant autonome pour
-              ne pas mélanger les fichiers avec le reste de la page. C'est le seul
-              formulaire d'ordre : marché et limite passent par le carnet. */}
-          <OrderBookPanel
-            symbol={selectedSymbol}
-            unit={quote?.unit ?? "unités"}
-            onExecuted={syncAccount}
-          />
-        </div>
+        {/* Carnet d'ordres (moteur d'exécution de M1) : composant autonome pour
+            ne pas mélanger les fichiers avec le reste de la page. Le choix de
+            l'actif se fait dans le panneau lui-même : carnet et formulaire
+            basculent d'actif en même temps. C'est le seul formulaire d'ordre :
+            marché et limite passent par le carnet. */}
+        <OrderBookPanel
+          symbol={selectedSymbol}
+          assets={assets}
+          onSymbolChange={setSelectedSymbol}
+          onExecuted={syncAccount}
+        />
 
         <section className="m1-card m1-chart-card">
           <div className="m1-card-heading">

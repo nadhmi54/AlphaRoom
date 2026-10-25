@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   cancelBookOrder,
   placeBookOrder,
@@ -56,10 +56,13 @@ function describeResult(result, unit) {
 }
 
 /**
- * Carnet d'ordres de M1 : bids en vert, asks en rouge, spread au milieu, mis à
- * jour en direct, avec passage d'ordres au marché ou limite et annulation.
+ * Carnet d'ordres de M1 : sélection de l'actif, bids en vert, asks en rouge,
+ * spread au milieu, mise à jour en direct, passage d'ordres au marché ou
+ * limite et annulation des ordres en attente.
  */
-export default function OrderBookPanel({ symbol, unit = "unités", onExecuted }) {
+export default function OrderBookPanel({ symbol, assets = [], onSymbolChange, onExecuted }) {
+  const asset = assets.find((item) => item.symbol === symbol);
+  const unit = asset?.unit ?? "unités";
   const { book, orders, error, loading, lastSync, refresh } = useOrderBook(symbol);
   const [side, setSide] = useState("buy");
   const [type, setType] = useState("limit");
@@ -69,6 +72,12 @@ export default function OrderBookPanel({ symbol, unit = "unités", onExecuted })
   const [cancelling, setCancelling] = useState(null);
   const [actionError, setActionError] = useState("");
   const [notice, setNotice] = useState("");
+
+  // Le prix limite saisi pour un actif n'a pas de sens pour un autre :
+  // on efface le champ au changement d'actif.
+  useEffect(() => {
+    setLimitPrice("");
+  }, [symbol]);
 
   const pendingOrders = useMemo(
     () => orders.filter((order) => PENDING.has(order.status)),
@@ -214,6 +223,25 @@ export default function OrderBookPanel({ symbol, unit = "unités", onExecuted })
             </div>
 
             <form className="ob-form" onSubmit={submitOrder}>
+              <label className="ob-field" htmlFor="ob-asset">
+                Actif
+                <select
+                  id="ob-asset"
+                  value={symbol}
+                  disabled={!assets.length}
+                  onChange={(event) => onSymbolChange?.(event.target.value)}
+                >
+                  {assets.map((item) => (
+                    <option key={item.symbol} value={item.symbol}>
+                      {item.name} · {item.symbol}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="ob-asset-info">
+                Dernier prix exécuté{asset ? ` · ${asset.category} · unité : ${unit}` : ""}
+              </p>
+
               <div className="ob-toggle" role="group" aria-label="Type d’ordre">
                 <button type="button" className={type === "limit" ? "selected" : ""} onClick={() => setType("limit")}>Limite</button>
                 <button type="button" className={type === "market" ? "selected" : ""} onClick={() => setType("market")}>Marché</button>
