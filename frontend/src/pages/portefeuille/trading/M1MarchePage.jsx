@@ -5,7 +5,6 @@ import { ApiError } from "../../../services/apiClient.js";
 import {
   getTradingAssets,
   getTradingPortfolio,
-  placeMarketOrder,
   resetTradingPortfolio,
 } from "../../../services/tradingService.js";
 import "./M1MarchePage.css";
@@ -78,12 +77,9 @@ export default function M1MarchePage() {
   const [assets, setAssets] = useState([]);
   const [account, setAccount] = useState(null);
   const [selectedSymbol, setSelectedSymbol] = useState("XAU/USD");
-  const [side, setSide] = useState("buy");
-  const [quantity, setQuantity] = useState("1");
   const [filters, setFilters] = useState({ symbol: "", side: "", from: "", to: "" });
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [loadError, setLoadError] = useState("");
@@ -175,42 +171,6 @@ export default function M1MarchePage() {
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [confirmReset]);
-
-  const units = Number(quantity);
-  const estimatedAmount =
-    quote && Number.isFinite(units) && units > 0 ? quote.price * units : 0;
-  const owned =
-    account?.positions.find((position) => position.symbol === selectedSymbol)?.quantity ?? 0;
-  const canSubmit =
-    account &&
-    quote &&
-    units > 0 &&
-    Number.isFinite(units) &&
-    (side === "buy" ? estimatedAmount <= account.portfolio.cash : units <= owned);
-
-  async function submitOrder(event) {
-    event.preventDefault();
-    if (!canSubmit) return;
-    setSubmitting(true);
-    setActionError("");
-    setNotice("");
-    try {
-      await placeMarketOrder({
-        symbol: quote.symbol,
-        side,
-        quantity: units,
-        requestId: crypto.randomUUID(),
-      });
-      setNotice(
-        `${side === "buy" ? "Achat" : "Vente"} simulé(e) : ${quantityFormat(units)} ${quote.unit}.`,
-      );
-      await refresh();
-    } catch (requestError) {
-      setActionError(requestError.message || "L’ordre n’a pas pu être exécuté.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
 
   async function handleReset() {
     setResetting(true);
@@ -378,39 +338,15 @@ export default function M1MarchePage() {
             <small>Prix fixés par le carnet d’ordres simulé, sans flux réel.</small>
           </article>
 
-          <form className="m1-card m1-order" onSubmit={submitOrder}>
-            <div className="m1-card-heading">
-              <div><span className="m1-eyebrow">NOUVELLE OPÉRATION</span><h3>Ordre au marché</h3></div>
-            </div>
-            <div className="m1-side-switch" role="group" aria-label="Sens de l’ordre">
-              <button type="button" className={side === "buy" ? "selected buy" : ""} onClick={() => setSide("buy")}>Acheter</button>
-              <button type="button" className={side === "sell" ? "selected sell" : ""} onClick={() => setSide("sell")}>Vendre</button>
-            </div>
-            <label htmlFor="m1-quantity">Quantité <span>({quote?.unit ?? "unités"})</span></label>
-            <input
-              id="m1-quantity"
-              type="number"
-              min="0.000001"
-              max="1000000"
-              step="0.000001"
-              value={quantity}
-              onChange={(event) => setQuantity(event.target.value)}
-            />
-            <div className="m1-estimate"><span>Montant estimé</span><strong>{money(estimatedAmount)}</strong></div>
-            <button className="m1-submit" type="submit" disabled={!canSubmit || submitting || loading}>
-              {submitting ? "Exécution…" : `${side === "buy" ? "Acheter" : "Vendre"} ${quantityFormat(units || 0)}`}
-            </button>
-            <small className="m1-order-note">Exécution immédiate au cours simulé. Aucun frais n’est appliqué.</small>
-          </form>
+          {/* Carnet d'ordres (moteur d'exécution de M1) : composant autonome pour
+              ne pas mélanger les fichiers avec le reste de la page. C'est le seul
+              formulaire d'ordre : marché et limite passent par le carnet. */}
+          <OrderBookPanel
+            symbol={selectedSymbol}
+            unit={quote?.unit ?? "unités"}
+            onExecuted={syncAccount}
+          />
         </div>
-
-        {/* Carnet d'ordres (moteur d'exécution de M1) : composant autonome pour
-            ne pas mélanger les fichiers avec le reste de la page. */}
-        <OrderBookPanel
-          symbol={selectedSymbol}
-          unit={quote?.unit ?? "unités"}
-          onExecuted={syncAccount}
-        />
 
         <section className="m1-card m1-chart-card">
           <div className="m1-card-heading">

@@ -209,8 +209,9 @@
 }
 .m1-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.8fr);
+  grid-template-columns: minmax(280px, 0.75fr) minmax(0, 1.5fr);
   gap: 14px;
+  align-items: start;
 }
 .m1-card-heading {
   display: flex;
@@ -245,85 +246,6 @@
 .m1-quote > small {
   font-size: 10px;
   color: #727d91;
-}
-.m1-side-switch {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 5px;
-  background: #080b13;
-  padding: 4px;
-  border-radius: 10px;
-  margin: 18px 0;
-}
-.m1-side-switch button {
-  border: 0;
-  border-radius: 7px;
-  padding: 10px;
-  background: transparent;
-  color: #8892a5;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.m1-side-switch button.selected.buy {
-  background: rgba(75, 211, 162, 0.15);
-  color: #4bd3a2;
-}
-.m1-side-switch button.selected.sell {
-  background: rgba(250, 119, 125, 0.15);
-  color: #fa777d;
-}
-.m1-order label {
-  display: block;
-  font-size: 12px;
-  margin-bottom: 8px;
-}
-.m1-order label span {
-  color: #818b9e;
-}
-.m1-order input {
-  box-sizing: border-box;
-  width: 100%;
-  background: #080b13;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  color: #fff;
-  padding: 12px;
-  font:
-    14px "JetBrains Mono",
-    monospace;
-  outline: none;
-}
-.m1-order input:focus {
-  border-color: #d9b877;
-}
-.m1-estimate {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin: 16px 0;
-  font-size: 13px;
-}
-.m1-estimate strong {
-  font:
-    600 14px "JetBrains Mono",
-    monospace;
-}
-.m1-submit {
-  width: 100%;
-  border: 0;
-  border-radius: 9px;
-  background: #d9b877;
-  color: #11131a;
-  padding: 12px;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-}
-.m1-submit:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
 }
 .m1-order-note {
   display: block;
