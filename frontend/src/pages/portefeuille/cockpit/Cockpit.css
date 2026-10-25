@@ -1,0 +1,285 @@
+/* ===== Page « cockpit » ===== */
+.ck-page {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  isolation: isolate;
+}
+/* Éclairage d'ambiance : la page prend une teinte douce selon que le
+   portefeuille gagne (vert) ou perd (rouge) depuis le départ. */
+.ck-page::before {
+  content: "";
+  position: absolute;
+  inset: -60px 0 auto 0;
+  height: 380px;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(60% 100% at 18% 0%, var(--ck-glow, rgba(217, 184, 119, 0.1)), transparent 70%);
+  transition: background 1.2s ease;
+}
+.ck-page[data-mood="up"] { --ck-glow: rgba(63, 209, 160, 0.16); }
+.ck-page[data-mood="down"] { --ck-glow: rgba(255, 107, 122, 0.15); }
+.ck-page .is-up { color: #3fd1a0; }
+.ck-page .is-down { color: #ff6b7a; }
+
+.ck-eyebrow {
+  font: 700 10px "JetBrains Mono", monospace;
+  letter-spacing: 1.3px;
+  color: #d9b877;
+}
+
+/* ===== Bandeau de prix ===== */
+.ck-ticker {
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 999px;
+  background: rgba(8, 11, 20, 0.7);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+}
+.ck-ticker--empty { height: 38px; }
+.ck-ticker-track {
+  display: flex;
+  width: max-content;
+  animation: ck-scroll 38s linear infinite;
+}
+.ck-ticker:hover .ck-ticker-track { animation-play-state: paused; }
+.ck-ticker-set { display: flex; flex-shrink: 0; }
+.ck-ticker-item {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 22px;
+  border: 0;
+  background: none;
+  color: #cbd0db;
+  font: 500 12px "JetBrains Mono", monospace;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ck-ticker-item:hover { color: #fff; }
+.ck-ticker-item strong { color: #eef1f7; font-weight: 600; }
+.ck-ticker-item em { font-style: normal; font-weight: 600; }
+.ck-ticker-item i { width: 6px; height: 6px; border-radius: 50%; }
+.ck-ticker-item i.is-live { background: #3fd1a0; }
+.ck-ticker-item i.is-sim { border: 1.5px solid #d9b877; }
+@keyframes ck-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+/* ===== Hero : valeur du portefeuille ===== */
+.ck-hero {
+  display: grid;
+  align-items: center;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 24px;
+  padding: 18px 24px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 24px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.01)),
+    rgba(10, 13, 22, 0.78);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 24px 60px -30px rgba(0, 0, 0, 0.7);
+}
+.ck-hero-main { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.ck-hero-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.ck-hero-tools { display: flex; align-items: center; gap: 8px; }
+.ck-hero-value {
+  font: 600 clamp(34px, 4.2vw, 52px) "JetBrains Mono", monospace;
+  letter-spacing: -2px;
+  word-spacing: -0.25em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.ck-hero-value small { font-size: 0.34em; letter-spacing: 0; word-spacing: normal; color: #818b9e; margin-left: 4px; }
+.ck-hero-value--wait { color: #4a5368; }
+.ck-hero-return { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ck-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  font: 600 13px "JetBrains Mono", monospace;
+}
+.ck-pill.is-up { border-color: rgba(63, 209, 160, 0.4); background: rgba(63, 209, 160, 0.1); }
+.ck-pill.is-down { border-color: rgba(255, 107, 122, 0.4); background: rgba(255, 107, 122, 0.1); }
+.ck-hero-since { font-size: 12px; color: #818b9e; }
+
+.ck-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(75, 211, 162, 0.28);
+  background: rgba(75, 211, 162, 0.07);
+  color: #9fe6c9;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.ck-live i { width: 7px; height: 7px; border-radius: 50%; background: #4bd3a2; animation: lm-ping 1.8s ease-out infinite; }
+.ck-live em { font: 600 10px "JetBrains Mono", monospace; font-style: normal; color: #6ce0b4; }
+.ck-live.is-offline { border-color: rgba(255, 255, 255, 0.12); background: rgba(255, 255, 255, 0.04); color: #8892a5; }
+.ck-live.is-offline i { background: #717c8f; animation: none; }
+
+.ck-split-bar { height: 8px; border-radius: 999px; background: linear-gradient(90deg, #d9b877, #3fd1a0); overflow: hidden; position: relative; }
+.ck-split-bar span {
+  position: absolute; inset: 0 auto 0 0; background: rgba(255, 255, 255, 0.14);
+  border-right: 2px solid rgba(5, 7, 15, 0.9); transition: width 0.8s ease;
+}
+.ck-split-legend { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-top: 10px; font-size: 12px; color: #818b9e; }
+.ck-split-legend strong { color: #dfe3ec; font: 600 12px "JetBrains Mono", monospace; margin-left: 4px; }
+.ck-split-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 3px; margin-right: 6px; }
+.ck-split-legend .is-cash { background: rgba(255, 255, 255, 0.35); }
+.ck-split-legend .is-invested { background: #3fd1a0; }
+
+.ck-hero-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.ck-hero-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ck-hero-stats > div {
+  display: flex; flex-direction: column; gap: 4px; padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 14px; background: rgba(255, 255, 255, 0.025);
+}
+.ck-hero-stats span { font-size: 11px; color: #818b9e; }
+.ck-hero-stats strong { font: 600 18px "JetBrains Mono", monospace; }
+.ck-hero-stats small { font-size: 11px; color: #6f7a8f; }
+.ck-hero-pulse { display: flex; flex-direction: column; gap: 6px; }
+.ck-pulse { position: relative; height: 64px; color: #3fd1a0; }
+.ck-pulse.is-down { color: #ff6b7a; }
+.ck-pulse svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.ck-pulse-line { fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.ck-pulse-dot {
+  position: absolute; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%;
+  background: currentColor; box-shadow: 0 0 12px currentColor;
+}
+.ck-pulse-wait { margin: 0; font-size: 12px; color: #6f7a8f; line-height: 1.5; }
+
+/* ===== Menu ⋯ ===== */
+.ck-menu { position: relative; }
+.ck-icon-btn {
+  appearance: none; width: 32px; height: 32px; border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.12); background: rgba(255, 255, 255, 0.05);
+  color: #c4cbd9; font: 700 16px "Space Grotesk", sans-serif; line-height: 1; cursor: pointer;
+}
+.ck-icon-btn:hover { border-color: rgba(217, 184, 119, 0.5); color: #d9b877; }
+.ck-menu-list {
+  position: absolute; right: 0; top: 40px; z-index: 20; min-width: 260px; padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 14px;
+  background: rgba(11, 14, 24, 0.97); box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.8);
+}
+.ck-menu-list button {
+  appearance: none; width: 100%; text-align: left; border: 0; background: none;
+  padding: 10px 12px; border-radius: 10px; color: #eef1f7; font: 600 13px "Space Grotesk", sans-serif;
+  cursor: pointer; display: flex; flex-direction: column; gap: 3px;
+}
+.ck-menu-list button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); }
+.ck-menu-list button.is-danger { color: #ff9aa3; }
+.ck-menu-list small { font-weight: 400; font-size: 11px; color: #818b9e; }
+
+/* ===== Onglets ===== */
+.ck-tabs {
+  position: relative;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  padding: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: rgba(8, 11, 20, 0.7);
+}
+.ck-tabs button {
+  position: relative; z-index: 1; appearance: none; border: 0; background: none;
+  padding: 12px 10px; border-radius: 12px; color: #99a2b5;
+  font: 600 14px "Space Grotesk", sans-serif; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+  transition: color 0.2s;
+}
+.ck-tabs button:hover { color: #eef1f7; }
+.ck-tabs button.is-active { color: #05070f; }
+.ck-tabs button:focus-visible { outline: 2px solid #d9b877; outline-offset: -2px; }
+.ck-tabs button span {
+  min-width: 20px; padding: 1px 7px; border-radius: 999px; background: rgba(255, 255, 255, 0.1);
+  font: 600 11px "JetBrains Mono", monospace; text-align: center;
+}
+.ck-tabs button.is-active span { background: rgba(5, 7, 15, 0.18); }
+.ck-tabs kbd, .ck-hints kbd {
+  display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px;
+  border-radius: 5px; border: 1px solid rgba(255, 255, 255, 0.2);
+  font: 600 10px "JetBrains Mono", monospace; opacity: 0.7;
+}
+.ck-tabs button.is-active kbd { border-color: rgba(5, 7, 15, 0.35); }
+.ck-tabs-bar {
+  position: absolute; z-index: 0; top: 5px; bottom: 5px; left: 5px;
+  width: calc((100% - 10px) / 3); border-radius: 12px;
+  background: linear-gradient(135deg, #e6c98a, #d9b877);
+  box-shadow: 0 6px 24px -6px rgba(217, 184, 119, 0.55);
+  transition: transform 0.32s cubic-bezier(0.3, 0.9, 0.3, 1);
+}
+.ck-hints { margin: -6px 0 0; font-size: 11px; color: #6f7a8f; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+
+.ck-panel { display: flex; flex-direction: column; gap: 18px; animation: ck-rise 0.35s ease both; }
+@keyframes ck-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+.ck-equity-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 14px 0; }
+.ck-equity-stats div { padding: 10px 14px; border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 12px; background: rgba(255, 255, 255, 0.025); }
+.ck-equity-stats dt { font-size: 11px; color: #818b9e; margin-bottom: 4px; }
+.ck-equity-stats dd { margin: 0; font: 600 14px "JetBrains Mono", monospace; }
+.ck-side { padding: 3px 9px; border-radius: 999px; font: 600 11px "JetBrains Mono", monospace; }
+.ck-side.is-buy { color: #3fd1a0; background: rgba(63, 209, 160, 0.12); }
+.ck-side.is-sell { color: #ff6b7a; background: rgba(255, 107, 122, 0.12); }
+.ck-disclaimer { margin: 6px 0 0; text-align: center; font-size: 11px; color: #5d6679; }
+
+/* ===== Notifications ===== */
+.ck-toasts {
+  position: fixed; right: 20px; bottom: 20px; z-index: 120;
+  display: flex; flex-direction: column; gap: 10px; width: min(360px, calc(100vw - 40px));
+}
+.ck-toast {
+  display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: start;
+  padding: 14px 14px 14px 16px; border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(12, 15, 26, 0.96);
+  box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.8); backdrop-filter: blur(10px);
+  animation: ck-toast-in 0.35s cubic-bezier(0.3, 1.2, 0.4, 1) both;
+}
+.ck-toast strong { font-size: 13px; }
+.ck-toast p { margin: 3px 0 0; font-size: 12px; line-height: 1.5; color: #99a2b5; }
+.ck-toast-icon {
+  width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+  font: 700 12px "JetBrains Mono", monospace;
+}
+.ck-toast--success { border-color: rgba(63, 209, 160, 0.4); }
+.ck-toast--success .ck-toast-icon { background: #3fd1a0; color: #04140e; }
+.ck-toast--error { border-color: rgba(255, 107, 122, 0.45); }
+.ck-toast--error .ck-toast-icon { background: #ff6b7a; color: #1b0508; }
+.ck-toast--info .ck-toast-icon { background: #d9b877; color: #1b1405; }
+.ck-toast button {
+  appearance: none; border: 0; background: none; color: #818b9e; font-size: 18px; line-height: 1; cursor: pointer;
+}
+@keyframes ck-toast-in { from { opacity: 0; transform: translateY(14px) scale(0.96); } to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ck-ticker-track { animation: none; overflow-x: auto; }
+  .ck-ticker { -webkit-mask-image: none; mask-image: none; overflow-x: auto; }
+  .ck-panel, .ck-toast, .ck-tabs-bar, .ck-page::before { animation: none; transition: none; }
+  .ck-live i { animation: none; }
+}
+
+@media (max-width: 960px) {
+  .ck-hero { grid-template-columns: 1fr; padding: 20px; gap: 20px; }
+}
+@media (max-width: 640px) {
+  .ck-hero-pulse { display: none; }
+  .ck-tabs button { padding: 11px 2px; font-size: 12.5px; gap: 5px; }
+  .ck-tabs button span { min-width: 0; padding: 0 5px; font-size: 10px; }
+  .ck-tabs kbd, .ck-hints { display: none; }
+  .ck-equity-stats { grid-template-columns: 1fr; }
+  .ck-toasts { right: 12px; left: 12px; bottom: 12px; width: auto; }
+  .ck-ticker-item { padding: 9px 16px; }
+}

@@ -8,84 +8,63 @@ import {
   resetTradingPortfolio,
 } from "../../../services/tradingService.js";
 import "./M1MarchePage.css";
+import "../cockpit/Cockpit.css";
+import CockpitTabs from "../cockpit/CockpitTabs.jsx";
+import EquityPanel from "../cockpit/EquityPanel.jsx";
+import HistoryPanel from "../cockpit/HistoryPanel.jsx";
+import PortfolioHero from "../cockpit/PortfolioHero.jsx";
+import TickerTape from "../cockpit/TickerTape.jsx";
+import Toasts from "../cockpit/Toasts.jsx";
+import usePulse from "../cockpit/usePulse.js";
+import useShortcuts from "../cockpit/useShortcuts.js";
+import useToasts from "../cockpit/useToasts.js";
+import LiveMarketPanel from "../market/LiveMarketPanel.jsx";
+import useLiveMarket from "../market/useLiveMarket.js";
 import OrderBookPanel from "../OrderBook/OrderBookPanel.jsx";
+import PositionsPanel from "../positions/PositionsPanel.jsx";
 
-// Intervalle du rafraîchissement automatique du Dashboard (point 5 du rôle
-// « Compte & cash ») : les chiffres se mettent à jour sans recharger la page.
+// Intervalle du rafraîchissement automatique du portefeuille : les chiffres se
+// mettent à jour sans recharger la page.
 const LIVE_REFRESH_MS = 5000;
+
+const EMPTY_FILTERS = { symbol: "", side: "", from: "", to: "" };
+const TAB_STORAGE_KEY = "alpharoom.cockpit.tab";
+const TAB_IDS = ["trader", "portfolio", "history"];
 
 const describeError = (requestError) =>
   requestError instanceof ApiError && requestError.status === 401
     ? "Connectez-vous pour consulter et utiliser votre portefeuille virtuel."
     : requestError.message || "Impossible de charger les données du marché.";
 
-const money = (value) =>
-  new Intl.NumberFormat("fr-FR", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2,
-  }).format(value ?? 0);
-const quantityFormat = (value) =>
-  new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 6 }).format(value ?? 0);
-const dateFormat = (value) =>
-  new Intl.DateTimeFormat("fr-FR", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-
-function EquityChart({ points }) {
-  const values = points.map((point) => Number(point.value));
-  if (values.length === 0) values.push(100000);
-  const width = 720;
-  const height = 190;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const spread = max - min || 1;
-  const path = values
-    .map((value, index) => {
-      const x = values.length === 1 ? 0 : (index / (values.length - 1)) * width;
-      const y = height - ((value - min) / spread) * (height - 24) - 12;
-      return `${index === 0 ? "M" : "L"} ${x} ${y}`;
-    })
-    .join(" ");
-
-  return (
-    <div className="m1-chart-wrap">
-      <svg
-        className="m1-equity-chart"
-        viewBox={`0 0 ${width} ${height}`}
-        role="img"
-        aria-label="Évolution de la valeur totale du portefeuille après chaque exécution"
-        preserveAspectRatio="none"
-      >
-        <line x1="0" y1="178" x2={width} y2="178" className="m1-chart-axis" />
-        <path d={path} className="m1-chart-line" />
-      </svg>
-      <div className="m1-chart-caption">
-        <span>{points.length ? dateFormat(points[0].date) : "Début du compte"}</span>
-        <strong>{money(values.at(-1))}</strong>
-        <span>{points.length ? dateFormat(points.at(-1).date) : "Après les opérations"}</span>
-      </div>
-      <small className="m1-order-note">
-        Valeur reconstituée au dernier prix exécuté de chaque actif.
-      </small>
-    </div>
-  );
+// L'onglet choisi est retenu d'une visite à l'autre (si le navigateur le permet).
+function readStoredTab() {
+  try {
+    const stored = window.localStorage.getItem(TAB_STORAGE_KEY);
+    return TAB_IDS.includes(stored) ? stored : "trader";
+  } catch {
+    return "trader";
+  }
 }
 
 export default function M1MarchePage() {
   const [assets, setAssets] = useState([]);
   const [account, setAccount] = useState(null);
   const [selectedSymbol, setSelectedSymbol] = useState("XAU/USD");
-  const [filters, setFilters] = useState({ symbol: "", side: "", from: "", to: "" });
+  const [range, setRange] = useState("5m");
+  const [tab, setTabState] = useState(readStoredTab);
+  const [focus, setFocus] = useState(false);
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [resetting, setResetting] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
-  const [notice, setNotice] = useState("");
   const [lastSync, setLastSync] = useState(null);
+
+  const market = useLiveMarket(selectedSymbol, range);
+  const { toasts, push: pushToast, dismiss: dismissToast } = useToasts();
+  const pulse = usePulse(account?.portfolio?.totalValue, lastSync);
 
   const error = actionError || loadError;
   // Suit les requêtes en cours pour ne pas empiler les rafraîchissements auto.
@@ -94,14 +73,19 @@ export default function M1MarchePage() {
   // relancer à chaque mise à jour (sinon l'intervalle repartirait sans cesse).
   const hasAccount = useRef(false);
 
-  const assetBySymbol = useMemo(
-    () => new Map(assets.map((asset) => [asset.symbol, asset])),
-    [assets],
-  );
-
   useEffect(() => {
     hasAccount.current = Boolean(account);
   }, [account]);
+
+  const setTab = useCallback((next) => {
+    setTabState(next);
+    if (next !== "trader") setFocus(false);
+    try {
+      window.localStorage.setItem(TAB_STORAGE_KEY, next);
+    } catch {
+      // Stockage indisponible : l'onglet ne sera simplement pas retenu.
+    }
+  }, []);
 
   // Recharge uniquement le portefeuille (assets et cotations ne changent pas).
   const syncAccount = useCallback(async () => {
@@ -171,18 +155,46 @@ export default function M1MarchePage() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [confirmReset]);
 
+  // Plein écran : on fige le défilement de la page derrière le graphique.
+  useEffect(() => {
+    if (!focus) return undefined;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [focus]);
+
+  // Raccourcis : 1/2/3 changent d'onglet, F bascule le plein écran, Échap en sort.
+  const shortcuts = useMemo(
+    () => ({
+      1: () => setTab("trader"),
+      2: () => setTab("portfolio"),
+      3: () => setTab("history"),
+      f: () => {
+        if (tab === "trader") setFocus((value) => !value);
+      },
+      escape: () => setFocus(false),
+    }),
+    [tab, setTab],
+  );
+  useShortcuts(shortcuts);
+
   async function handleReset() {
     setResetting(true);
     setActionError("");
-    setNotice("");
     try {
       const nextAccount = await resetTradingPortfolio();
       setAccount(nextAccount);
       setLastSync(new Date());
       setLoadError("");
       setConfirmReset(false);
-      setNotice("Portefeuille réinitialisé : 100 000 $US de capital virtuel.");
-      setFilters({ symbol: "", side: "", from: "", to: "" });
+      pushToast({
+        tone: "success",
+        title: "Portefeuille réinitialisé",
+        text: "100 000 $US de capital virtuel, positions et historique effacés.",
+      });
+      setFilters(EMPTY_FILTERS);
       setPage(1);
     } catch (requestError) {
       setConfirmReset(false);
@@ -197,37 +209,30 @@ export default function M1MarchePage() {
     setFilters((current) => ({ ...current, [key]: value }));
   }
 
-  const stats = account?.stats;
-  const pagination = account?.history;
+  function clearFilters() {
+    setPage(1);
+    setFilters(EMPTY_FILTERS);
+  }
+
+  function selectFromTicker(symbol) {
+    setSelectedSymbol(symbol);
+    setTab("trader");
+  }
+
+  const openPositions = account?.positions?.filter((position) => position.quantity > 0).length ?? 0;
+  const returnPercent = account?.portfolio?.returnPercent ?? 0;
+  const mood = returnPercent > 0.005 ? "up" : returnPercent < -0.005 ? "down" : "flat";
+
+  const tabs = [
+    { id: "trader", label: "Trader" },
+    { id: "portfolio", label: "Portefeuille", badge: account ? openPositions : null },
+    { id: "history", label: "Historique", badge: account?.history?.total ?? null },
+  ];
 
   return (
     <ModuleShell moduleId="portefeuille">
-      <section className="m1-trading" aria-busy={loading}>
-        <div className="m1-intro">
-          <div>
-            <p className="m1-eyebrow">SIMULATEUR PÉDAGOGIQUE · USD</p>
-            <h2>Votre salle de marché</h2>
-            <p>Entraînez-vous avec un portefeuille virtuel. Aucun ordre n’est envoyé sur un marché réel.</p>
-          </div>
-          <div className="m1-intro-actions">
-            <div className="m1-market-status"><span /> Marché simulé</div>
-            <span className={`m1-live${account ? "" : " is-offline"}`} title={`Rafraîchissement automatique toutes les ${LIVE_REFRESH_MS / 1000} secondes`}>
-              <span className="m1-live-dot" aria-hidden="true" />
-              <span>{account ? "En direct" : "Hors ligne"}</span>
-              {account && lastSync && (
-                <em>{lastSync.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</em>
-              )}
-            </span>
-            <button
-              type="button"
-              className="m1-reset"
-              onClick={() => setConfirmReset(true)}
-              disabled={!account || resetting}
-            >
-              Réinitialiser
-            </button>
-          </div>
-        </div>
+      <section className="ck-page" data-mood={mood} aria-busy={loading}>
+        <TickerTape quotes={market.quotes} onSelect={selectFromTicker} />
 
         {error && (
           <div className="m1-message m1-message--error" role="alert">
@@ -235,6 +240,7 @@ export default function M1MarchePage() {
             {error.includes("Connectez-vous") && <Link to="/connexion">Se connecter</Link>}
           </div>
         )}
+
         {confirmReset && (
           <div
             className="m1-confirm"
@@ -259,163 +265,91 @@ export default function M1MarchePage() {
               >
                 Annuler
               </button>
-              <button
-                type="button"
-                className="m1-confirm-danger"
-                onClick={handleReset}
-                disabled={resetting}
-              >
+              <button type="button" className="m1-confirm-danger" onClick={handleReset} disabled={resetting}>
                 {resetting ? "Réinitialisation…" : "Confirmer la remise à zéro"}
               </button>
             </div>
           </div>
         )}
-        {notice && <div className="m1-message m1-message--success" role="status">{notice}</div>}
 
-        <div className="m1-summary" aria-label="Résumé du portefeuille">
-          <article className="m1-card m1-stat">
-            <span>Cash disponible</span>
-            <strong>{loading ? "—" : money(account?.portfolio.cash)}</strong>
-            <small>Solde en dollars virtuels</small>
-          </article>
-          <article className="m1-card m1-stat">
-            <span>Valeur du portefeuille</span>
-            <strong>{loading ? "—" : money(account?.portfolio.totalValue)}</strong>
-            <small>Cash + positions au prix simulé</small>
-          </article>
-          <article className="m1-card m1-stat">
-            <span>Performance totale</span>
-            <strong className={(account?.portfolio.returnAmount ?? 0) >= 0 ? "is-positive" : "is-negative"}>
-              {loading ? "—" : `${money(account?.portfolio.returnAmount)} (${quantityFormat(account?.portfolio.returnPercent)} %)`}
-            </strong>
-            <small>Depuis le capital initial de {money(account?.portfolio.initialCash)}</small>
-          </article>
-        </div>
-
-        <div className="m1-summary m1-summary--stats" aria-label="Statistiques de trading">
-          <article className="m1-card m1-stat">
-            <span>P&L réalisé</span>
-            <strong className={(stats?.realizedPnl ?? 0) >= 0 ? "is-positive" : "is-negative"}>
-              {loading ? "—" : money(stats?.realizedPnl)}
-            </strong>
-            <small>Résultat des positions vendues</small>
-          </article>
-          <article className="m1-card m1-stat">
-            <span>Taux de réussite</span>
-            <strong>{loading ? "—" : `${quantityFormat(stats?.winRate)} %`}</strong>
-            <small>{stats?.profitableTrades ?? 0} gains · {stats?.losingTrades ?? 0} pertes</small>
-          </article>
-          <article className="m1-card m1-stat">
-            <span>Opérations enregistrées</span>
-            <strong>{loading ? "—" : stats?.totalOrders ?? 0}</strong>
-            <small>{stats?.buyOrders ?? 0} achats · {stats?.sellOrders ?? 0} ventes</small>
-          </article>
-        </div>
-
-        {/* Carnet d'ordres (moteur d'exécution de M1) : composant autonome pour
-            ne pas mélanger les fichiers avec le reste de la page. Le choix de
-            l'actif se fait dans le panneau lui-même : carnet et formulaire
-            basculent d'actif en même temps. C'est le seul formulaire d'ordre :
-            marché et limite passent par le carnet. */}
-        <OrderBookPanel
-          symbol={selectedSymbol}
-          assets={assets}
-          onSymbolChange={setSelectedSymbol}
-          onExecuted={syncAccount}
+        <PortfolioHero
+          account={account}
+          loading={loading}
+          lastSync={lastSync}
+          pulse={pulse}
+          resetting={resetting}
+          onReset={() => setConfirmReset(true)}
         />
 
-        <section className="m1-card m1-chart-card">
-          <div className="m1-card-heading">
-            <div><span className="m1-eyebrow">PERFORMANCE</span><h3>Évolution de la valeur du portefeuille</h3></div>
-            <span className="m1-tag">{account?.equityCurve.length ?? 0} exécutions</span>
-          </div>
-          <EquityChart points={account?.equityCurve ?? []} />
-        </section>
+        <CockpitTabs tabs={tabs} active={tab} onChange={setTab} />
 
-        <section className="m1-card m1-table-card">
-          <div className="m1-card-heading">
-            <div><span className="m1-eyebrow">PORTEFEUILLE</span><h3>Positions ouvertes</h3></div>
-          </div>
-          {!account?.positions.some((position) => position.quantity > 0) ? (
-            <p className="m1-empty">Aucune position ouverte. Choisissez un actif et passez un achat simulé pour commencer.</p>
-          ) : (
-            <div className="m1-table-wrap">
-              <table>
-                <thead><tr><th>Actif</th><th>Quantité</th><th>Prix moyen</th><th>Valeur</th><th>P&L latent</th></tr></thead>
-                <tbody>
-                  {account.positions.filter((position) => position.quantity > 0).map((position) => (
-                    <tr key={position.symbol}>
-                      <td>{assetBySymbol.get(position.symbol)?.name ?? position.symbol} · {position.symbol}</td>
-                      <td>{quantityFormat(position.quantity)} {assetBySymbol.get(position.symbol)?.unit}</td>
-                      <td>{money(position.averagePrice)}</td>
-                      <td>{money(position.marketValue)}</td>
-                      <td className={position.unrealizedPnl >= 0 ? "is-positive" : "is-negative"}>{money(position.unrealizedPnl)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+        {tab === "trader" && (
+          <p className="ck-hints" aria-hidden="true">
+            <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> onglets · <kbd>F</kbd> plein écran · <kbd>B</kbd> acheter · <kbd>S</kbd> vendre
+          </p>
+        )}
 
-        <section className="m1-card m1-table-card">
-          <div className="m1-card-heading">
-            <div><span className="m1-eyebrow">HISTORIQUE</span><h3>Exécutions ({pagination?.total ?? 0})</h3></div>
-            <button className="m1-refresh" type="button" onClick={refresh} disabled={loading}>Actualiser</button>
-          </div>
-          <div className="m1-filters" aria-label="Filtres de l’historique">
-            <label>Actif
-              <select value={filters.symbol} onChange={(event) => updateFilter("symbol", event.target.value)}>
-                <option value="">Tous les actifs</option>
-                {assets.map((asset) => <option key={asset.symbol} value={asset.symbol}>{asset.symbol}</option>)}
-              </select>
-            </label>
-            <label>Opération
-              <select value={filters.side} onChange={(event) => updateFilter("side", event.target.value)}>
-                <option value="">Achats et ventes</option><option value="buy">Achats</option><option value="sell">Ventes</option>
-              </select>
-            </label>
-            <label>Du
-              <input type="date" value={filters.from} onChange={(event) => updateFilter("from", event.target.value)} />
-            </label>
-            <label>Au
-              <input type="date" value={filters.to} onChange={(event) => updateFilter("to", event.target.value)} />
-            </label>
-            <button className="m1-refresh" type="button" onClick={() => { setPage(1); setFilters({ symbol: "", side: "", from: "", to: "" }); }}>Effacer les filtres</button>
-          </div>
-          {!account?.executions.length ? (
-            <p className="m1-empty">Aucune opération ne correspond à ces filtres.</p>
-          ) : (
-            <div className="m1-table-wrap">
-              <table>
-                <thead><tr><th>Date</th><th>Actif</th><th>Opération</th><th>Quantité</th><th>Prix</th><th>Montant</th><th>P&L réalisé</th></tr></thead>
-                <tbody>
-                  {account.executions.map((execution) => (
-                    <tr key={execution.id}>
-                      <td>{dateFormat(execution.executedAt)}</td>
-                      <td>{execution.symbol}</td>
-                      <td className={execution.side === "buy" ? "is-positive" : "is-negative"}>{execution.side === "buy" ? "Achat" : "Vente"}</td>
-                      <td>{quantityFormat(execution.quantity)} {assetBySymbol.get(execution.symbol)?.unit}</td>
-                      <td>{money(execution.price)}</td>
-                      <td>{money(execution.amount)}</td>
-                      <td className={(execution.realizedPnl ?? 0) >= 0 ? "is-positive" : "is-negative"}>{execution.side === "sell" ? money(execution.realizedPnl) : "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+        <div
+          key={tab}
+          className="ck-panel"
+          role="tabpanel"
+          id={`ck-panel-${tab}`}
+          aria-labelledby={`ck-tab-${tab}`}
+        >
+          {tab === "trader" && (
+            <>
+              <LiveMarketPanel
+                market={market}
+                symbol={selectedSymbol}
+                onSymbolChange={setSelectedSymbol}
+                range={range}
+                onRangeChange={setRange}
+                assets={assets}
+                account={account}
+                onExecuted={syncAccount}
+                onToast={pushToast}
+                focus={focus}
+                onFocusChange={setFocus}
+              />
+              {/* Carnet d'ordres (moteur d'exécution) : composant autonome. Le
+                  choix de l'actif est partagé avec le graphique au-dessus. C'est
+                  ici que se passent les ordres limite. */}
+              <OrderBookPanel
+                symbol={selectedSymbol}
+                assets={assets}
+                onSymbolChange={setSelectedSymbol}
+                onExecuted={syncAccount}
+              />
+            </>
           )}
-          {pagination?.pages > 1 && (
-            <div className="m1-pagination">
-              <span>Page {pagination.page} sur {pagination.pages}</span>
-              <div>
-                <button type="button" className="m1-refresh" disabled={page <= 1 || loading} onClick={() => setPage((current) => current - 1)}>Précédent</button>
-                <button type="button" className="m1-refresh" disabled={page >= pagination.pages || loading} onClick={() => setPage((current) => current + 1)}>Suivant</button>
-              </div>
-            </div>
+
+          {tab === "portfolio" && (
+            <>
+              <PositionsPanel refreshKey={lastSync} assets={assets} />
+              <EquityPanel account={account} />
+            </>
           )}
-        </section>
+
+          {tab === "history" && (
+            <HistoryPanel
+              account={account}
+              assets={assets}
+              filters={filters}
+              onFilter={updateFilter}
+              onClear={clearFilters}
+              page={page}
+              onPage={setPage}
+              loading={loading}
+              onRefresh={refresh}
+            />
+          )}
+        </div>
+
+        <p className="ck-disclaimer">
+          Simulateur pédagogique · montants en USD · aucun ordre n’est envoyé sur un marché réel.
+        </p>
       </section>
+      <Toasts toasts={toasts} onDismiss={dismissToast} />
     </ModuleShell>
   );
 }
