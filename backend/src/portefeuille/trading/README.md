@@ -9,7 +9,7 @@ de marché en direct ni aucun courtier ne sont utilisés.
 | Symbole | Actif | Unité | Prix de démonstration |
 | --- | --- | --- | ---: |
 | XAU/USD | Or | once troy (oz) | 2 685,40 USD |
-| EUR/USD | Euro / Dollar | EUR | 1,0834 USD |
+| EUR/USD | Euro/Dollar | EUR | 1,0834 USD |
 | BTC/USD | Bitcoin | BTC | 67 500,00 USD |
 | AAPL | Apple | action | 224,50 USD |
 
