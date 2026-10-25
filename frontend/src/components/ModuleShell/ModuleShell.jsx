@@ -2,9 +2,8 @@ import { Link } from 'react-router-dom';
 import { MODULES } from '../../data/modules.js';
 import './ModuleShell.css';
 
-// Cadre commun aux pages des 6 modules : barre du haut (logo + retour à
-// l'accueil), titre du module, puis une zone de travail vide (`children`).
-// Chaque équipe construit son module dans sa propre page (src/pages/Modules/…).
+// Cadre de la page Portefeuille : barre du haut (logo + retour à
+// l'accueil), titre du module, puis une zone de travail (`children`).
 export default function ModuleShell({ moduleId, children }) {
   const module = MODULES.find((item) => item.id === moduleId);
   if (!module) return null;

@@ -1,13 +1,23 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import ModuleShell from "../../../components/ModuleShell/ModuleShell.jsx";
 import { ApiError } from "../../../services/apiClient.js";
 import {
   getTradingAssets,
   getTradingPortfolio,
-  placeMarketOrder,
+  resetTradingPortfolio,
 } from "../../../services/tradingService.js";
 import "./M1MarchePage.css";
+import OrderBookPanel from "../OrderBook/OrderBookPanel.jsx";
+
+// Intervalle du rafraîchissement automatique du Dashboard (point 5 du rôle
+// « Compte & cash ») : les chiffres se mettent à jour sans recharger la page.
+const LIVE_REFRESH_MS = 5000;
+
+const describeError = (requestError) =>
+  requestError instanceof ApiError && requestError.status === 401
+    ? "Connectez-vous pour consulter et utiliser votre portefeuille virtuel."
+    : requestError.message || "Impossible de charger les données du marché.";
 
 const money = (value) =>
   new Intl.NumberFormat("fr-FR", {
@@ -57,7 +67,7 @@ function EquityChart({ points }) {
         <span>{points.length ? dateFormat(points.at(-1).date) : "Après les opérations"}</span>
       </div>
       <small className="m1-order-note">
-        Valeur reconstituée au prix fixe de démonstration de chaque actif.
+        Valeur reconstituée au dernier prix exécuté de chaque actif.
       </small>
     </div>
   );
@@ -67,23 +77,52 @@ export default function M1MarchePage() {
   const [assets, setAssets] = useState([]);
   const [account, setAccount] = useState(null);
   const [selectedSymbol, setSelectedSymbol] = useState("XAU/USD");
-  const [side, setSide] = useState("buy");
-  const [quantity, setQuantity] = useState("1");
   const [filters, setFilters] = useState({ symbol: "", side: "", from: "", to: "" });
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
+  const [resetting, setResetting] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const [actionError, setActionError] = useState("");
   const [notice, setNotice] = useState("");
+  const [lastSync, setLastSync] = useState(null);
 
-  const quote = assets.find((asset) => asset.symbol === selectedSymbol);
+  const error = actionError || loadError;
+  // Suit les requêtes en cours pour ne pas empiler les rafraîchissements auto.
+  const pendingRequests = useRef(0);
+  // Permet au minuteur de savoir s'il y a un compte à rafraîchir sans le
+  // relancer à chaque mise à jour (sinon l'intervalle repartirait sans cesse).
+  const hasAccount = useRef(false);
+
   const assetBySymbol = useMemo(
     () => new Map(assets.map((asset) => [asset.symbol, asset])),
     [assets],
   );
 
+  useEffect(() => {
+    hasAccount.current = Boolean(account);
+  }, [account]);
+
+  // Recharge uniquement le portefeuille (assets et cotations ne changent pas).
+  const syncAccount = useCallback(async () => {
+    if (pendingRequests.current > 0) return;
+    pendingRequests.current += 1;
+    try {
+      const nextAccount = await getTradingPortfolio({ ...filters, page, limit: 20 });
+      setAccount(nextAccount);
+      setLastSync(new Date());
+      setLoadError("");
+    } catch (requestError) {
+      setLoadError(describeError(requestError));
+    } finally {
+      pendingRequests.current -= 1;
+    }
+  }, [filters, page]);
+
+  // Chargement complet : utilisé au montage, au changement de filtre et après
+  // une action (ordre, remise à zéro) pour refléter immédiatement le résultat.
   const refresh = useCallback(async () => {
-    setError("");
+    pendingRequests.current += 1;
     try {
       const [nextAssets, nextAccount] = await Promise.all([
         getTradingAssets(),
@@ -91,13 +130,12 @@ export default function M1MarchePage() {
       ]);
       setAssets(nextAssets);
       setAccount(nextAccount);
+      setLastSync(new Date());
+      setLoadError("");
     } catch (requestError) {
-      setError(
-        requestError instanceof ApiError && requestError.status === 401
-          ? "Connectez-vous pour consulter et utiliser votre portefeuille virtuel."
-          : requestError.message || "Impossible de charger les données du marché.",
-      );
+      setLoadError(describeError(requestError));
     } finally {
+      pendingRequests.current -= 1;
       setLoading(false);
     }
   }, [filters, page]);
@@ -106,39 +144,51 @@ export default function M1MarchePage() {
     refresh();
   }, [refresh]);
 
-  const units = Number(quantity);
-  const estimatedAmount =
-    quote && Number.isFinite(units) && units > 0 ? quote.price * units : 0;
-  const owned =
-    account?.positions.find((position) => position.symbol === selectedSymbol)?.quantity ?? 0;
-  const canSubmit =
-    account &&
-    quote &&
-    units > 0 &&
-    Number.isFinite(units) &&
-    (side === "buy" ? estimatedAmount <= account.portfolio.cash : units <= owned);
+  // Affichage en direct : rafraîchissement silencieux tant que l'onglet est
+  // visible, plus une synchronisation immédiate au retour sur la page.
+  useEffect(() => {
+    const tick = () => {
+      if (document.visibilityState !== "visible" || !hasAccount.current) return;
+      syncAccount();
+    };
+    const timer = window.setInterval(tick, LIVE_REFRESH_MS);
+    document.addEventListener("visibilitychange", tick);
+    window.addEventListener("focus", tick);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", tick);
+      window.removeEventListener("focus", tick);
+    };
+  }, [syncAccount]);
 
-  async function submitOrder(event) {
-    event.preventDefault();
-    if (!canSubmit) return;
-    setSubmitting(true);
-    setError("");
+  // Échap ferme la confirmation de remise à zéro.
+  useEffect(() => {
+    if (!confirmReset) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") setConfirmReset(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [confirmReset]);
+
+  async function handleReset() {
+    setResetting(true);
+    setActionError("");
     setNotice("");
     try {
-      await placeMarketOrder({
-        symbol: quote.symbol,
-        side,
-        quantity: units,
-        requestId: crypto.randomUUID(),
-      });
-      setNotice(
-        `${side === "buy" ? "Achat" : "Vente"} simulé(e) : ${quantityFormat(units)} ${quote.unit}.`,
-      );
-      await refresh();
+      const nextAccount = await resetTradingPortfolio();
+      setAccount(nextAccount);
+      setLastSync(new Date());
+      setLoadError("");
+      setConfirmReset(false);
+      setNotice("Portefeuille réinitialisé : 100 000 $US de capital virtuel.");
+      setFilters({ symbol: "", side: "", from: "", to: "" });
+      setPage(1);
     } catch (requestError) {
-      setError(requestError.message || "L’ordre n’a pas pu être exécuté.");
+      setConfirmReset(false);
+      setActionError(requestError.message || "La réinitialisation a échoué.");
     } finally {
-      setSubmitting(false);
+      setResetting(false);
     }
   }
 
@@ -151,7 +201,7 @@ export default function M1MarchePage() {
   const pagination = account?.history;
 
   return (
-    <ModuleShell moduleId="m1">
+    <ModuleShell moduleId="portefeuille">
       <section className="m1-trading" aria-busy={loading}>
         <div className="m1-intro">
           <div>
@@ -159,13 +209,65 @@ export default function M1MarchePage() {
             <h2>Votre salle de marché</h2>
             <p>Entraînez-vous avec un portefeuille virtuel. Aucun ordre n’est envoyé sur un marché réel.</p>
           </div>
-          <div className="m1-market-status"><span /> Marché simulé</div>
+          <div className="m1-intro-actions">
+            <div className="m1-market-status"><span /> Marché simulé</div>
+            <span className={`m1-live${account ? "" : " is-offline"}`} title={`Rafraîchissement automatique toutes les ${LIVE_REFRESH_MS / 1000} secondes`}>
+              <span className="m1-live-dot" aria-hidden="true" />
+              <span>{account ? "En direct" : "Hors ligne"}</span>
+              {account && lastSync && (
+                <em>{lastSync.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</em>
+              )}
+            </span>
+            <button
+              type="button"
+              className="m1-reset"
+              onClick={() => setConfirmReset(true)}
+              disabled={!account || resetting}
+            >
+              Réinitialiser
+            </button>
+          </div>
         </div>
 
         {error && (
           <div className="m1-message m1-message--error" role="alert">
             <span>{error}</span>
             {error.includes("Connectez-vous") && <Link to="/connexion">Se connecter</Link>}
+          </div>
+        )}
+        {confirmReset && (
+          <div
+            className="m1-confirm"
+            role="alertdialog"
+            aria-labelledby="m1-reset-title"
+            aria-describedby="m1-reset-desc"
+          >
+            <div>
+              <strong id="m1-reset-title">Réinitialiser le portefeuille ?</strong>
+              <p id="m1-reset-desc">
+                Le cash revient à 100 000 $US. Les positions ouvertes et tout l’historique
+                d’exécution seront définitivement effacés.
+              </p>
+            </div>
+            <div className="m1-confirm-actions">
+              <button
+                type="button"
+                className="m1-refresh"
+                onClick={() => setConfirmReset(false)}
+                disabled={resetting}
+                autoFocus
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                className="m1-confirm-danger"
+                onClick={handleReset}
+                disabled={resetting}
+              >
+                {resetting ? "Réinitialisation…" : "Confirmer la remise à zéro"}
+              </button>
+            </div>
           </div>
         )}
         {notice && <div className="m1-message m1-message--success" role="status">{notice}</div>}
@@ -210,56 +312,17 @@ export default function M1MarchePage() {
           </article>
         </div>
 
-        <div className="m1-workspace">
-          <article className="m1-card m1-quote">
-            <div className="m1-card-heading">
-              <div>
-                <span className="m1-eyebrow">ACTIFS SIMULÉS</span>
-                <label className="m1-select-label" htmlFor="m1-asset">Choisir un actif</label>
-              </div>
-              <span className="m1-tag">Cours fixe</span>
-            </div>
-            <select
-              id="m1-asset"
-              className="m1-select"
-              value={selectedSymbol}
-              onChange={(event) => setSelectedSymbol(event.target.value)}
-              disabled={!assets.length}
-            >
-              {assets.map((asset) => (
-                <option key={asset.symbol} value={asset.symbol}>{asset.name} · {asset.symbol}</option>
-              ))}
-            </select>
-            <strong className="m1-price">{quote ? money(quote.price) : "—"}</strong>
-            <p>{quote ? `${quote.symbol} · ${quote.category} · unité : ${quote.unit}` : "Chargement des actifs…"}</p>
-            <small>Aucun flux de marché réel n’est utilisé.</small>
-          </article>
-
-          <form className="m1-card m1-order" onSubmit={submitOrder}>
-            <div className="m1-card-heading">
-              <div><span className="m1-eyebrow">NOUVELLE OPÉRATION</span><h3>Ordre au marché</h3></div>
-            </div>
-            <div className="m1-side-switch" role="group" aria-label="Sens de l’ordre">
-              <button type="button" className={side === "buy" ? "selected buy" : ""} onClick={() => setSide("buy")}>Acheter</button>
-              <button type="button" className={side === "sell" ? "selected sell" : ""} onClick={() => setSide("sell")}>Vendre</button>
-            </div>
-            <label htmlFor="m1-quantity">Quantité <span>({quote?.unit ?? "unités"})</span></label>
-            <input
-              id="m1-quantity"
-              type="number"
-              min="0.000001"
-              max="1000000"
-              step="0.000001"
-              value={quantity}
-              onChange={(event) => setQuantity(event.target.value)}
-            />
-            <div className="m1-estimate"><span>Montant estimé</span><strong>{money(estimatedAmount)}</strong></div>
-            <button className="m1-submit" type="submit" disabled={!canSubmit || submitting || loading}>
-              {submitting ? "Exécution…" : `${side === "buy" ? "Acheter" : "Vendre"} ${quantityFormat(units || 0)}`}
-            </button>
-            <small className="m1-order-note">Exécution immédiate au cours simulé. Aucun frais n’est appliqué.</small>
-          </form>
-        </div>
+        {/* Carnet d'ordres (moteur d'exécution de M1) : composant autonome pour
+            ne pas mélanger les fichiers avec le reste de la page. Le choix de
+            l'actif se fait dans le panneau lui-même : carnet et formulaire
+            basculent d'actif en même temps. C'est le seul formulaire d'ordre :
+            marché et limite passent par le carnet. */}
+        <OrderBookPanel
+          symbol={selectedSymbol}
+          assets={assets}
+          onSymbolChange={setSelectedSymbol}
+          onExecuted={syncAccount}
+        />
 
         <section className="m1-card m1-chart-card">
           <div className="m1-card-heading">

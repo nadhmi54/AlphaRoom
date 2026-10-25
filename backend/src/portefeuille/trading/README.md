@@ -9,7 +9,7 @@ de marché en direct ni aucun courtier ne sont utilisés.
 | Symbole | Actif | Unité | Prix de démonstration |
 | --- | --- | --- | ---: |
 | XAU/USD | Or | once troy (oz) | 2 685,40 USD |
-| EUR/USD | Euro / Dollar | EUR | 1,0834 USD |
+| EUR/USD | Euro/Dollar | EUR | 1,0834 USD |
 | BTC/USD | Bitcoin | BTC | 67 500,00 USD |
 | AAPL | Apple | action | 224,50 USD |
 
@@ -23,6 +23,8 @@ de marché en direct ni aucun courtier ne sont utilisés.
 - Statistiques globales : nombre d'ordres, P&L réalisé, trades gagnants/perdants,
   taux de réussite et évolution de la valeur totale estimée.
 - Identifiant de requête idempotent pour éviter de compter deux fois une requête.
+- Remise à zéro du compte (cash à 100 000 USD, positions et historique effacés).
+- Dashboard rafraîchi automatiquement toutes les 5 secondes, sans rechargement.
 - Routes protégées par l'authentification Supabase et le profil AlphaRoom.
 
 ## API
@@ -35,6 +37,7 @@ Toutes les routes nécessitent `Authorization: Bearer <Supabase access token>`.
 | GET | `/api/trading/quote?symbol=XAU%2FUSD` | Cotation d'un actif (sans symbole : liste complète) |
 | GET | `/api/trading/portfolio` | Portefeuille, positions, statistiques et historique |
 | POST | `/api/trading/orders/market` | Achat/vente simulé |
+| POST | `/api/trading/portfolio/reset` | Remise à zéro : cash à 100 000 USD, positions et historique effacés |
 
 Filtres facultatifs de l'historique : `symbol`, `side`, `from`, `to`, `page` et
 `limit` (100 lignes maximum par page). Les statistiques sont calculées sur tout

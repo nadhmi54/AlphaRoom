@@ -47,6 +47,123 @@
   background: #e2b65f;
   box-shadow: 0 0 12px #e2b65f;
 }
+.m1-intro-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.m1-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 12px;
+  border: 1px solid rgba(75, 211, 162, 0.24);
+  border-radius: 999px;
+  background: rgba(75, 211, 162, 0.07);
+  font-size: 11px;
+  color: #9fe6c9;
+  white-space: nowrap;
+}
+.m1-live em {
+  font: 600 10px "JetBrains Mono", monospace;
+  font-style: normal;
+  color: #6ce0b4;
+}
+.m1-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #4bd3a2;
+  animation: m1-live-pulse 1.8s ease-out infinite;
+}
+.m1-live.is-offline {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #8892a5;
+}
+.m1-live.is-offline .m1-live-dot {
+  background: #717c8f;
+  animation: none;
+}
+@keyframes m1-live-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(75, 211, 162, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(75, 211, 162, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(75, 211, 162, 0);
+  }
+}
+.m1-reset {
+  border: 1px solid rgba(250, 119, 125, 0.32);
+  border-radius: 999px;
+  background: rgba(250, 119, 125, 0.08);
+  color: #ff9a9f;
+  padding: 9px 14px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.m1-reset:hover:not(:disabled) {
+  border-color: rgba(250, 119, 125, 0.6);
+  background: rgba(250, 119, 125, 0.16);
+}
+.m1-reset:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.m1-confirm {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 18px;
+  border: 1px solid rgba(250, 119, 125, 0.35);
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(250, 119, 125, 0.13), rgba(250, 119, 125, 0.05));
+}
+.m1-confirm strong {
+  font-size: 14px;
+  color: #ffd7d9;
+}
+.m1-confirm p {
+  margin: 5px 0 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: #f3b7ba;
+}
+.m1-confirm-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+}
+.m1-confirm-danger {
+  border: 0;
+  border-radius: 8px;
+  background: #fa777d;
+  color: #20100f;
+  padding: 10px 14px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.m1-confirm-danger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+@media (prefers-reduced-motion: reduce) {
+  .m1-live-dot {
+    animation: none;
+  }
+}
 .m1-card {
   min-width: 0;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -81,6 +198,9 @@
 }
 .m1-stat small,
 .m1-order-note {
+  display: block;
+  margin-top: 10px;
+  line-height: 1.5;
   color: #727d91;
   font-size: 11px;
 }
@@ -90,11 +210,8 @@
 .is-negative {
   color: #fa777d !important;
 }
-.m1-workspace {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.8fr);
-  gap: 14px;
-}
+/* Le carnet d'ordres est passé pleine largeur : le panneau OrderBookPanel
+   apporte sa propre mise en page (ob-…). */
 .m1-card-heading {
   display: flex;
   justify-content: space-between;
@@ -111,108 +228,6 @@
     monospace;
   color: #818b9e;
   margin-left: 5px;
-}
-.m1-price {
-  display: block;
-  font:
-    600 clamp(30px, 4vw, 42px) "JetBrains Mono",
-    monospace;
-  letter-spacing: -2px;
-  margin: 28px 0 5px;
-}
-.m1-quote > p {
-  font-size: 12px;
-  color: #99a2b5;
-  margin: 0 0 17px;
-}
-.m1-quote > small {
-  font-size: 10px;
-  color: #727d91;
-}
-.m1-side-switch {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 5px;
-  background: #080b13;
-  padding: 4px;
-  border-radius: 10px;
-  margin: 18px 0;
-}
-.m1-side-switch button {
-  border: 0;
-  border-radius: 7px;
-  padding: 10px;
-  background: transparent;
-  color: #8892a5;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.m1-side-switch button.selected.buy {
-  background: rgba(75, 211, 162, 0.15);
-  color: #4bd3a2;
-}
-.m1-side-switch button.selected.sell {
-  background: rgba(250, 119, 125, 0.15);
-  color: #fa777d;
-}
-.m1-order label {
-  display: block;
-  font-size: 12px;
-  margin-bottom: 8px;
-}
-.m1-order label span {
-  color: #818b9e;
-}
-.m1-order input {
-  box-sizing: border-box;
-  width: 100%;
-  background: #080b13;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  color: #fff;
-  padding: 12px;
-  font:
-    14px "JetBrains Mono",
-    monospace;
-  outline: none;
-}
-.m1-order input:focus {
-  border-color: #d9b877;
-}
-.m1-estimate {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin: 16px 0;
-  font-size: 13px;
-}
-.m1-estimate strong {
-  font:
-    600 14px "JetBrains Mono",
-    monospace;
-}
-.m1-submit {
-  width: 100%;
-  border: 0;
-  border-radius: 9px;
-  background: #d9b877;
-  color: #11131a;
-  padding: 12px;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-}
-.m1-submit:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-.m1-order-note {
-  display: block;
-  text-align: center;
-  margin-top: 10px;
-  line-height: 1.5;
 }
 .m1-lower-grid {
   display: grid;
@@ -276,14 +291,6 @@
 .m1-summary--stats {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
-.m1-select-label {
-  display: block;
-  margin-top: 8px;
-  color: #cbd0db;
-  font-size: 14px;
-  font-weight: 600;
-}
-.m1-select,
 .m1-filters select,
 .m1-filters input {
   box-sizing: border-box;
@@ -295,14 +302,6 @@
   padding: 9px 11px;
   font: inherit;
   color-scheme: dark;
-}
-.m1-select {
-  width: 100%;
-  margin-top: 18px;
-}
-.m1-chart-card h3 {
-  margin: 6px 0 0;
-  font-size: 17px;
 }
 .m1-chart-wrap {
   margin-top: 20px;
@@ -396,6 +395,13 @@
   .m1-intro {
     flex-direction: column;
   }
+  .m1-intro-actions {
+    justify-content: flex-start;
+  }
+  .m1-confirm {
+    flex-direction: column;
+    align-items: flex-start;
+  }
   .m1-summary {
     grid-template-columns: 1fr;
   }
@@ -404,9 +410,6 @@
   }
   .m1-filters {
     grid-template-columns: 1fr 1fr;
-  }
-  .m1-workspace {
-    grid-template-columns: 1fr;
   }
   .m1-card {
     padding: 16px;

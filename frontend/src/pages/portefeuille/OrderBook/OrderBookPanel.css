@@ -1,0 +1,437 @@
+/* Carnet d'ordres de M1. Préfixe `ob-` pour ne pas entrer en collision avec
+   les classes `m1-` de M1MarchePage.css (fichiers possédés par deux personnes). */
+
+.ob-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(19, 23, 35, 0.96), rgba(10, 13, 22, 0.96));
+  padding: 20px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+}
+
+.ob-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ob-header h3 {
+  margin: 4px 0 0;
+  font-size: 18px;
+}
+.ob-eyebrow {
+  font:
+    700 10px "JetBrains Mono",
+    monospace;
+  letter-spacing: 1.3px;
+  color: #d9b877;
+}
+.ob-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 11px;
+  border: 1px solid rgba(75, 211, 162, 0.24);
+  border-radius: 999px;
+  background: rgba(75, 211, 162, 0.07);
+  font-size: 11px;
+  color: #9fe6c9;
+  white-space: nowrap;
+}
+.ob-live.is-offline {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #8892a5;
+}
+.ob-live em {
+  font: 600 10px "JetBrains Mono", monospace;
+  color: #6ce0b4;
+}
+.ob-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #4bd3a2;
+  box-shadow: 0 0 10px #4bd3a2;
+}
+.ob-live.is-offline .ob-dot {
+  background: #717c8f;
+  box-shadow: none;
+}
+
+.ob-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(270px, 0.85fr);
+  gap: 18px;
+  align-items: start;
+}
+
+/* --- Carnet (échelle de prix) ------------------------------------------- */
+
+.ob-book {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.ob-book-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font: 700 10px "JetBrains Mono", monospace;
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+  color: #727d91;
+  padding: 2px 8px;
+}
+.ob-levels {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ob-level {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.ob-level:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.03);
+}
+.ob-level:focus-visible {
+  outline: 2px solid #d9b877;
+  outline-offset: 1px;
+}
+.ob-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 6px;
+}
+.ob-level--sell .ob-bar {
+  background: linear-gradient(90deg, rgba(250, 119, 125, 0.03), rgba(250, 119, 125, 0.16));
+}
+.ob-level--buy .ob-bar {
+  background: linear-gradient(90deg, rgba(75, 211, 162, 0.03), rgba(75, 211, 162, 0.16));
+}
+.ob-price,
+.ob-qty {
+  position: relative;
+  z-index: 1;
+  font: 600 12.5px "JetBrains Mono", monospace;
+  font-variant-numeric: tabular-nums;
+}
+.ob-level--sell .ob-price {
+  color: #fa777d;
+}
+.ob-level--buy .ob-price {
+  color: #4bd3a2;
+}
+.ob-qty {
+  color: #99a2b5;
+  font-weight: 500;
+}
+
+.ob-spread {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 4px 0;
+  padding: 8px 10px;
+  border-top: 1px solid rgba(217, 184, 119, 0.18);
+  border-bottom: 1px solid rgba(217, 184, 119, 0.18);
+  background: rgba(217, 184, 119, 0.05);
+  border-radius: 8px;
+  font-size: 11px;
+  color: #9ca5b7;
+}
+.ob-spread strong {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font: 700 13px "JetBrains Mono", monospace;
+  color: #e3d1a8;
+}
+.ob-spread small {
+  font-size: 10px;
+  font-weight: 500;
+  color: #858fa2;
+}
+.ob-last {
+  font: 600 11px "JetBrains Mono", monospace;
+  color: #cbd0db;
+}
+
+.ob-empty {
+  margin: 0;
+  padding: 10px 8px;
+  font-size: 12px;
+  color: #727d91;
+}
+
+/* --- Formulaire d'ordre -------------------------------------------------- */
+
+.ob-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  background: rgba(8, 11, 19, 0.55);
+}
+.ob-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(8, 11, 19, 0.6);
+}
+.ob-toggle button {
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: #99a2b5;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.ob-toggle button:hover {
+  color: #e9edf5;
+}
+.ob-toggle button.selected {
+  background: rgba(217, 184, 119, 0.14);
+  border-color: rgba(217, 184, 119, 0.4);
+  color: #f0e2c0;
+}
+.ob-toggle--side .ob-buy.selected {
+  background: rgba(75, 211, 162, 0.14);
+  border-color: rgba(75, 211, 162, 0.42);
+  color: #9fe6c9;
+}
+.ob-toggle--side .ob-sell.selected {
+  background: rgba(250, 119, 125, 0.14);
+  border-color: rgba(250, 119, 125, 0.42);
+  color: #ffd7d9;
+}
+.ob-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #8892a5;
+}
+.ob-field span {
+  text-transform: none;
+  font-weight: 500;
+  color: #727d91;
+}
+.ob-field input {
+  padding: 9px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: #080b13;
+  color: #e9edf5;
+  font: 500 13px "JetBrains Mono", monospace;
+}
+.ob-field select {
+  padding: 9px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: #080b13;
+  color: #e9edf5;
+  font: 500 13px "JetBrains Mono", monospace;
+  color-scheme: dark;
+  cursor: pointer;
+}
+.ob-asset-info {
+  margin: -3px 0 0;
+  font-size: 10px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: #727d91;
+}
+.ob-field input:focus {
+  outline: none;
+  border-color: #d9b877;
+}
+.ob-estimate {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 11px;
+  color: #8892a5;
+}
+.ob-estimate strong {
+  font: 600 13px "JetBrains Mono", monospace;
+  color: #e9edf5;
+}
+.ob-submit {
+  padding: 11px 14px;
+  border: 1px solid rgba(75, 211, 162, 0.45);
+  border-radius: 9px;
+  background: rgba(75, 211, 162, 0.16);
+  color: #9fe6c9;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+.ob-submit:hover:not(:disabled) {
+  background: rgba(75, 211, 162, 0.24);
+}
+.ob-submit.is-sell {
+  border-color: rgba(250, 119, 125, 0.45);
+  background: rgba(250, 119, 125, 0.16);
+  color: #ffd7d9;
+}
+.ob-submit.is-sell:hover:not(:disabled) {
+  background: rgba(250, 119, 125, 0.24);
+}
+.ob-submit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.ob-hint {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #727d91;
+}
+
+/* --- Messages ------------------------------------------------------------ */
+
+.ob-message {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 9px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #cbd0db;
+}
+.ob-message--error {
+  border-color: rgba(250, 119, 125, 0.35);
+  background: rgba(250, 119, 125, 0.08);
+  color: #ffd7d9;
+}
+.ob-message--success {
+  border-color: rgba(75, 211, 162, 0.35);
+  background: rgba(75, 211, 162, 0.08);
+  color: #9fe6c9;
+}
+
+/* --- Ordres en attente --------------------------------------------------- */
+
+.ob-orders {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  padding-top: 10px;
+}
+.ob-order-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ob-order-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.ob-order-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ob-order-main strong {
+  font-size: 12.5px;
+}
+.ob-order-main span {
+  font-size: 11px;
+  color: #8892a5;
+}
+.ob-buy-text {
+  color: #4bd3a2;
+}
+.ob-sell-text {
+  color: #fa777d;
+}
+.ob-cancel {
+  flex: none;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 7px;
+  background: transparent;
+  color: #cbd0db;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ob-cancel:hover:not(:disabled) {
+  border-color: rgba(250, 119, 125, 0.5);
+  color: #ffd7d9;
+}
+.ob-cancel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 900px) {
+  .ob-body {
+    grid-template-columns: 1fr;
+  }
+  .ob-card {
+    padding: 16px;
+  }
+}

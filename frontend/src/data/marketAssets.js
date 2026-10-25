@@ -60,7 +60,7 @@ export const MARKET_ASSETS = [
     image: '/images/markets/eurusd.jpg',
     category: 'Devises (Forex)',
     symbol: 'EUR/USD',
-    name: 'Euro / Dollar',
+    name: 'Euro/Dollar',
     price: '1.0842',
     change: '-0.21%',
     up: false,
