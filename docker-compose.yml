@@ -1,8 +1,6 @@
 services:
-  # PostgreSQL/Auth/Realtime/Storage sont maintenant fournis par Supabase :
-  #  - en local, via la CLI Supabase ("supabase start", nécessite Docker
-  #    Desktop) qui lance sa propre stack Docker séparée de ce fichier ;
-  #  - en staging/prod, via le projet Supabase hébergé.
+  # PostgreSQL/Auth/Realtime/Storage sont fournis par le projet Supabase Cloud,
+  # indépendamment des conteneurs applicatifs lancés par ce fichier.
   # Il n'y a donc plus de service "db" ici. Voir backend/.env.example pour
   # les variables de connexion (DATABASE_URL, SUPABASE_URL, ...).
 
@@ -25,6 +23,8 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_URL: /api
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:?Set VITE_SUPABASE_URL in the root .env file}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:?Set VITE_SUPABASE_ANON_KEY in the root .env file}
     container_name: alpharoom-frontend
     restart: unless-stopped
     depends_on:
