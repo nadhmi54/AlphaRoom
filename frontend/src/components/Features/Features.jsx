@@ -52,16 +52,16 @@ export default function Features() {
         <header className="ar-features__head">
           <span className="ar-features__pill">
             <span className="ar-features__pill-dot" />
-            6 modules fonctionnels
+            Module fonctionnel · Portefeuille
           </span>
           <h2 className="ar-features__title">
             Une salle de marché,
             <br />
-            <span className="ar-features__title--accent">six métiers.</span>
+            <span className="ar-features__title--accent">un portefeuille complet.</span>
           </h2>
           <p className="ar-features__lead">
-            Chaque module couvre un métier de la finance. Ensemble, ils forment un simulateur
-            complet : de l&apos;ordre de bourse au stress test bancaire.
+            Carnet d&apos;ordres simulé, exécution au prix du marché et suivi du portefeuille :
+            de l&apos;ordre de bourse au P&amp;L, dans des conditions réelles.
           </p>
         </header>
 

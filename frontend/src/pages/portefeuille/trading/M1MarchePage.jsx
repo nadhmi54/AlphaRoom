@@ -9,7 +9,7 @@ import {
   resetTradingPortfolio,
 } from "../../../services/tradingService.js";
 import "./M1MarchePage.css";
-import OrderBookPanel from "./OrderBook/OrderBookPanel.jsx";
+import OrderBookPanel from "../OrderBook/OrderBookPanel.jsx";
 
 // Intervalle du rafraîchissement automatique du Dashboard (point 5 du rôle
 // « Compte & cash ») : les chiffres se mettent à jour sans recharger la page.
@@ -242,7 +242,7 @@ export default function M1MarchePage() {
   const pagination = account?.history;
 
   return (
-    <ModuleShell moduleId="m1">
+    <ModuleShell moduleId="portefeuille">
       <section className="m1-trading" aria-busy={loading}>
         <div className="m1-intro">
           <div>

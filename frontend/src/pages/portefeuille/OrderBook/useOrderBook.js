@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ApiError } from "../../../../services/apiClient.js";
-import { getMyOrders, getOrderBook } from "../../../../services/orderBookService.js";
+import { ApiError } from "../../../services/apiClient.js";
+import { getMyOrders, getOrderBook } from "../../../services/orderBookService.js";
 
 // Le carnet bouge à chaque exécution : il est rafraîchi toutes les 2 s tant que
 // l'onglet est visible (le portefeuille de M1 garde son propre rythme de 5 s).

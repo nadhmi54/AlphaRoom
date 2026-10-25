@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
-import { Auth } from '../users/auth.decorator.js';
-import { CurrentProfile } from '../users/current-profile.decorator.js';
-import type { Profile } from '../users/profile.entity.js';
+import { Auth } from '../../users/auth.decorator.js';
+import { CurrentProfile } from '../../users/current-profile.decorator.js';
+import type { Profile } from '../../users/profile.entity.js';
 import { BookQueryDto } from './dto/book-query.dto.js';
 import { OrdersQueryDto } from './dto/orders-query.dto.js';
 import { PlaceBookOrderDto } from './dto/place-book-order.dto.js';

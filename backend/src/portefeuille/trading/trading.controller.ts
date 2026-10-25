@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Query } from '@nestjs/common';
-import { Auth } from '../users/auth.decorator.js';
-import { CurrentProfile } from '../users/current-profile.decorator.js';
-import type { Profile } from '../users/profile.entity.js';
+import { Auth } from '../../users/auth.decorator.js';
+import { CurrentProfile } from '../../users/current-profile.decorator.js';
+import type { Profile } from '../../users/profile.entity.js';
 import { PortfolioHistoryQueryDto } from './dto/portfolio-history-query.dto.js';
 import { TradingService } from './trading.service.js';
 

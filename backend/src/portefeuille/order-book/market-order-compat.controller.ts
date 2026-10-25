@@ -1,7 +1,7 @@
 import { Body, Controller, Post } from '@nestjs/common';
-import { Auth } from '../users/auth.decorator.js';
-import { CurrentProfile } from '../users/current-profile.decorator.js';
-import type { Profile } from '../users/profile.entity.js';
+import { Auth } from '../../users/auth.decorator.js';
+import { CurrentProfile } from '../../users/current-profile.decorator.js';
+import type { Profile } from '../../users/profile.entity.js';
 import { PlaceOrderDto } from '../trading/dto/place-order.dto.js';
 import { OrderBookService } from './order-book.service.js';
 

@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import {
   cancelBookOrder,
   placeBookOrder,
-} from "../../../../services/orderBookService.js";
+} from "../../../services/orderBookService.js";
 import { BOOK_REFRESH_MS, useOrderBook } from "./useOrderBook.js";
 import "./OrderBookPanel.css";
 

@@ -5,8 +5,8 @@ import { DatabaseModule } from './database/database.module.js';
 import { HealthModule } from './health/health.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { UsersModule } from './users/users.module.js';
-import { TradingModule } from './trading/trading.module.js';
-import { OrderBookModule } from './order-book/order-book.module.js';
+import { TradingModule } from './portefeuille/trading/trading.module.js';
+import { OrderBookModule } from './portefeuille/order-book/order-book.module.js';
 
 @Module({
   imports: [

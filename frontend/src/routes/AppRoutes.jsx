@@ -14,26 +14,20 @@ const SignUpPage = lazy(() => import('../pages/SignUp/SignUpPage.jsx'));
 const ProfilePage = lazy(() => import('../pages/Profile/ProfilePage.jsx'));
 const AdminUsersPage = lazy(() => import('../pages/Admin/AdminUsersPage.jsx'));
 
-// Un module = une page = un dossier dans src/pages/Modules/ (une équipe par module).
-const M1MarchePage = lazy(() => import('../pages/Modules/M1Marche/M1MarchePage.jsx'));
-const M2IntelligenceIAPage = lazy(() => import('../pages/Modules/M2IntelligenceIA/M2IntelligenceIAPage.jsx'));
-const M3FormationPage = lazy(() => import('../pages/Modules/M3Formation/M3FormationPage.jsx'));
-const M4MeneurDeJeuPage = lazy(() => import('../pages/Modules/M4MeneurDeJeu/M4MeneurDeJeuPage.jsx'));
-const M5StressTestingPage = lazy(() => import('../pages/Modules/M5StressTesting/M5StressTestingPage.jsx'));
-const M6ActuariatPage = lazy(() => import('../pages/Modules/M6Actuariat/M6ActuariatPage.jsx'));
+// Le module Portefeuille = une page = un dossier dans src/pages/Portefeuille/.
+const PortefeuillePage = lazy(() => import('../pages/portefeuille/trading/M1MarchePage.jsx'));
 
-// Les chemins correspondent à `path` dans src/data/modules.js.
+// La route du module Portefeuille (anciennement M1 Marché — les autres
+// modules ont été retirés du prototype). Les chemins correspondent à `path`
+// dans src/data/modules.js.
 const PAGES = [
   { path: '/connexion', Page: SignInPage },
   { path: '/inscription', Page: SignUpPage },
   { path: '/profil', Page: ProfilePage, protect: true },
   { path: '/admin/utilisateurs', Page: AdminUsersPage, protect: true, roles: ['admin'] },
-  { path: '/marche', Page: M1MarchePage },
-  { path: '/intelligence-ia', Page: M2IntelligenceIAPage },
-  { path: '/formation', Page: M3FormationPage },
-  { path: '/meneur-de-jeu', Page: M4MeneurDeJeuPage },
-  { path: '/stress-testing', Page: M5StressTestingPage },
-  { path: '/actuariat', Page: M6ActuariatPage },
+  { path: '/marche', Page: PortefeuillePage },
+  // Alias sémantique : le module s'appelle désormais « Portefeuille ».
+  { path: '/portefeuille', Page: PortefeuillePage },
 ];
 
 // Point d'entrée unique pour toutes les routes de l'application.

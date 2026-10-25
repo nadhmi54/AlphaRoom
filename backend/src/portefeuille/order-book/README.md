@@ -85,5 +85,5 @@ Toutes les routes exigent `Authorization: Bearer <Supabase access token>`.
 | `order.entity.ts`, `order-book-mark.entity.ts` | Entités TypeORM |
 | `dto/` | Validation des entrées (`class-validator`) |
 
-L'interface se trouve dans `frontend/src/pages/Modules/M1Marche/OrderBook/`
-(composant autonome, branché sur la page M1).
+L'interface se trouve dans `frontend/src/pages/Portefeuille/OrderBook/`
+(composant autonome, branché sur la page du portefeuille).
