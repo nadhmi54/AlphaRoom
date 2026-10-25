@@ -7,19 +7,25 @@ import { TypeOrmModule } from '@nestjs/typeorm';
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        type: 'postgres',
-        url: config.get<string>('DATABASE_URL'),
-        autoLoadEntities: true,
-        // Supabase's pooled connection (pgbouncer, port 6543) requires SSL;
-        // the local Supabase stack (`supabase start`) does not.
-        ssl: config.get<string>('DATABASE_URL', '').includes('supabase.co')
-          ? { rejectUnauthorized: false }
-          : false,
-        // Convenient while entities don't exist yet; switch to migrations
-        // once real tables/business modules are added.
-        synchronize: process.env.NODE_ENV !== 'production',
-      }),
+      useFactory: (config: ConfigService) => {
+        const databaseUrl = config.get<string>('DATABASE_URL', '');
+        const databaseHost = new URL(databaseUrl).hostname;
+        const isHostedSupabase =
+          databaseHost.endsWith('.supabase.co') ||
+          databaseHost.endsWith('.pooler.supabase.com');
+
+        return {
+          type: 'postgres' as const,
+          url: databaseUrl,
+          autoLoadEntities: true,
+          // Hosted Supabase direct and pooled connections use SSL. The local
+          // Supabase CLI connection on localhost does not.
+          ssl: isHostedSupabase ? { rejectUnauthorized: false } : false,
+          // Convenient while entities don't exist yet; switch to migrations
+          // once real tables/business modules are added.
+          synchronize: process.env.NODE_ENV !== 'production',
+        };
+      },
     }),
   ],
 })
