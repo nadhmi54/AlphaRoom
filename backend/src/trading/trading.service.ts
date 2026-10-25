@@ -4,15 +4,28 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, type Repository } from 'typeorm';
+import { DataSource, type EntityManager, type Repository } from 'typeorm';
+import { Order } from '../order-book/order.entity.js';
+import { OrderBookMark } from '../order-book/order-book-mark.entity.js';
 import { TradingPortfolio } from './portfolio.entity.js';
 import { TradingPosition } from './position.entity.js';
 import { TradeExecution } from './trade-execution.entity.js';
-import type { PlaceOrderDto } from './dto/place-order.dto.js';
 import type { PortfolioHistoryQueryDto } from './dto/portfolio-history-query.dto.js';
 import { findMarketAsset, MARKET_ASSETS } from './market-assets.js';
 
 const STARTING_CASH = '100000.00';
+
+/** Exécution produite par le carnet d'ordres, déjà valorisée. */
+export interface FillInput {
+  ownerId: string;
+  symbol: string;
+  side: 'buy' | 'sell';
+  quantity: number;
+  price: number;
+  amount: number;
+  requestId: string;
+  orderId: string;
+}
 
 @Injectable()
 export class TradingService {
@@ -24,14 +37,36 @@ export class TradingService {
     private readonly positions: Repository<TradingPosition>,
     @InjectRepository(TradeExecution)
     private readonly executions: Repository<TradeExecution>,
+    @InjectRepository(OrderBookMark)
+    private readonly marks: Repository<OrderBookMark>,
   ) {}
 
-  getAssets() {
-    return MARKET_ASSETS;
+  /**
+   * Cours de chaque actif : dernier prix exécuté dans le carnet s'il existe,
+   * prix de démonstration sinon (carnet encore vide).
+   */
+  private async priceMap() {
+    const prices = new Map<string, number>(
+      MARKET_ASSETS.map((asset) => [asset.symbol, asset.price]),
+    );
+    for (const mark of await this.marks.find()) {
+      prices.set(mark.symbol, Number(mark.lastPrice));
+    }
+    return prices;
+  }
+
+  async getAssets() {
+    const prices = await this.priceMap();
+    return MARKET_ASSETS.map((asset) => ({
+      ...asset,
+      price: prices.get(asset.symbol) ?? asset.price,
+      referencePrice: asset.price,
+    }));
   }
 
   async getPortfolio(ownerId: string, filters: PortfolioHistoryQueryDto) {
     const portfolio = await this.getOrCreatePortfolio(ownerId);
+    const prices = await this.priceMap();
     const positions = await this.positions.find({
       where: { portfolioId: portfolio.id },
       order: { symbol: 'ASC' },
@@ -66,13 +101,14 @@ export class TradingService {
       .take(pageSize)
       .getManyAndCount();
 
-    const positionViews = positions.map((position) => this.positionView(position));
+    const positionViews = positions.map((position) => this.positionView(position, prices));
     const marketValue = positionViews.reduce((sum, item) => sum + item.marketValue, 0);
     const initialCash = Number(portfolio.initialCash);
     const performance = this.calculatePerformance(
       allExecutions,
       initialCash,
       portfolio.createdAt,
+      prices,
     );
     const totalValue = Number(portfolio.cash) + marketValue;
 
@@ -100,89 +136,127 @@ export class TradingService {
     };
   }
 
-  async placeOrder(ownerId: string, dto: PlaceOrderDto) {
-    const asset = findMarketAsset(dto.symbol);
-    if (!asset) throw new BadRequestException('Actif non disponible dans la simulation.');
-
-    const existing = await this.executions.findOne({
-      where: { ownerId, requestId: dto.requestId },
+  /**
+   * Comptabilise **une** exécution décidée par le carnet d'ordres : cash,
+   * position et ligne d'historique, dans la transaction fournie par l'appelant.
+   *
+   * C'est le seul chemin d'écriture des exécutions : le carnet décide qui
+   * s'apparie et à quel prix, `TradingService` tient les comptes. M1 (cash),
+   * M2 (positions) et M5 (historique) lisent tous `trade_executions`.
+   */
+  async applyFill(manager: EntityManager, fill: FillInput): Promise<TradeExecution> {
+    const portfolio = await this.lockPortfolio(manager, fill.ownerId);
+    const positionRepo = manager.getRepository(TradingPosition);
+    let position = await positionRepo.findOne({
+      where: { portfolioId: portfolio.id, symbol: fill.symbol },
     });
-    if (existing) return { ...this.executionView(existing), duplicate: true };
 
+    const heldQuantity = Number(position?.quantity ?? 0);
+    const cash = Number(portfolio.cash);
+    const quantity = Number(fill.quantity);
+    const amount = Number(fill.amount);
+
+    if (fill.side === 'buy') {
+      if (amount > cash) {
+        throw new BadRequestException(
+          `Solde insuffisant : il manque ${this.money(amount - cash).toFixed(2)} USD.`,
+        );
+      }
+      const newQuantity = heldQuantity + quantity;
+      const newAverage =
+        (heldQuantity * Number(position?.averagePrice ?? 0) + amount) / newQuantity;
+      if (!position) {
+        position = positionRepo.create({ portfolioId: portfolio.id, symbol: fill.symbol });
+      }
+      position.quantity = newQuantity.toFixed(6);
+      position.averagePrice = newAverage.toFixed(4);
+      portfolio.cash = this.money(cash - amount).toFixed(2);
+    } else {
+      if (quantity > heldQuantity + 0.0000005) {
+        throw new BadRequestException(
+          `Quantité insuffisante : vous détenez ${heldQuantity} ${fill.symbol}.`,
+        );
+      }
+      if (!position) throw new BadRequestException('Aucune position à vendre.');
+      const remaining = heldQuantity - quantity;
+      position.quantity =
+        Math.abs(remaining) < 0.0000005 ? '0.000000' : remaining.toFixed(6);
+      portfolio.cash = this.money(cash + amount).toFixed(2);
+    }
+
+    await positionRepo.save(position);
+    await manager.getRepository(TradingPortfolio).save(portfolio);
+
+    const execution = manager.getRepository(TradeExecution).create({
+      ownerId: fill.ownerId,
+      portfolioId: portfolio.id,
+      requestId: fill.requestId,
+      orderId: fill.orderId,
+      symbol: fill.symbol,
+      side: fill.side,
+      quantity: quantity.toFixed(6),
+      price: Number(fill.price).toFixed(4),
+      amount: amount.toFixed(2),
+    });
+    return manager.getRepository(TradeExecution).save(execution);
+  }
+
+  /**
+   * Récupère le portefeuille et le verrouille jusqu'à la fin de la transaction
+   * (`select ... for update`) : deux exécutions simultanées ne peuvent pas
+   * lire le même cash et écraser mutuellement leur mise à jour.
+   */
+  async lockPortfolio(manager: EntityManager, ownerId: string): Promise<TradingPortfolio> {
     const portfolio = await this.getOrCreatePortfolio(ownerId);
-    const quantity = Number(dto.quantity);
-    const amount = this.money(asset.price * quantity);
-    if (amount < 0.01)
-      throw new BadRequestException('Le montant minimum d’un ordre est de 0,01 USD.');
+    const locked = await manager.getRepository(TradingPortfolio).findOne({
+      where: { id: portfolio.id },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!locked) throw new NotFoundException('Portefeuille introuvable.');
+    return locked;
+  }
 
-    return this.dataSource.transaction(async (manager) => {
+  /**
+   * Remet le compte à zéro : les positions, l'historique d'exécution et les
+   * ordres en attente sont effacés et le cash revient au capital initial. Le
+   * portefeuille lui-même est conservé (relation 1-1 avec le profil), ce qui
+   * évite de recréer la ligne.
+   */
+  async resetPortfolio(ownerId: string) {
+    const portfolio = await this.getOrCreatePortfolio(ownerId);
+
+    await this.dataSource.transaction(async (manager) => {
       const locked = await manager.getRepository(TradingPortfolio).findOne({
         where: { id: portfolio.id },
         lock: { mode: 'pessimistic_write' },
       });
       if (!locked) throw new NotFoundException('Portefeuille introuvable.');
 
-      const priorExecution = await manager.getRepository(TradeExecution).findOne({
-        where: { ownerId, requestId: dto.requestId },
-      });
-      if (priorExecution)
-        return { ...this.executionView(priorExecution), duplicate: true };
+      // Les ordres laissés dans le carnet bloqueraient une partie du cash et
+      // des quantités du compte remis à zéro.
+      await manager.getRepository(Order).delete({ ownerId });
+      await manager.getRepository(TradeExecution).delete({ portfolioId: locked.id });
+      await manager.getRepository(TradingPosition).delete({ portfolioId: locked.id });
 
-      const positionRepo = manager.getRepository(TradingPosition);
-      let position = await positionRepo.findOne({
-        where: { portfolioId: locked.id, symbol: dto.symbol },
-      });
-      const heldQuantity = Number(position?.quantity ?? 0);
-      const cash = Number(locked.cash);
-      if (dto.side === 'buy' && amount > cash) {
-        throw new BadRequestException(
-          `Solde insuffisant : il manque ${this.money(amount - cash).toFixed(2)} USD.`,
-        );
-      }
-      if (dto.side === 'sell' && quantity > heldQuantity) {
-        throw new BadRequestException(
-          `Quantité insuffisante : vous détenez ${heldQuantity} ${asset.unit}.`,
-        );
-      }
-
-      if (dto.side === 'buy') {
-        const newQuantity = heldQuantity + quantity;
-        const newAverage =
-          (heldQuantity * Number(position?.averagePrice ?? 0) + amount) / newQuantity;
-        if (!position)
-          position = positionRepo.create({ portfolioId: locked.id, symbol: dto.symbol });
-        position.quantity = newQuantity.toFixed(6);
-        position.averagePrice = newAverage.toFixed(4);
-        locked.cash = this.money(cash - amount).toFixed(2);
-      } else {
-        const remaining = heldQuantity - quantity;
-        position!.quantity =
-          Math.abs(remaining) < 0.0000005 ? '0.000000' : remaining.toFixed(6);
-        locked.cash = this.money(cash + amount).toFixed(2);
-      }
-
-      const execution = manager.getRepository(TradeExecution).create({
-        ownerId,
-        portfolioId: locked.id,
-        requestId: dto.requestId,
-        symbol: dto.symbol,
-        side: dto.side,
-        quantity: quantity.toFixed(6),
-        price: asset.price.toFixed(4),
-        amount: amount.toFixed(2),
-      });
-      await manager.getRepository(TradeExecution).save(execution);
-      await positionRepo.save(position!);
+      locked.cash = STARTING_CASH;
+      locked.initialCash = STARTING_CASH;
       await manager.getRepository(TradingPortfolio).save(locked);
-      return { ...this.executionView(execution), duplicate: false };
     });
+
+    return this.getPortfolio(ownerId, { page: 1, limit: 20 } as PortfolioHistoryQueryDto);
   }
 
   async getQuote(symbol?: string) {
-    if (!symbol) return MARKET_ASSETS;
+    const prices = await this.priceMap();
+    const quote = (asset: (typeof MARKET_ASSETS)[number]) => ({
+      ...asset,
+      price: prices.get(asset.symbol) ?? asset.price,
+      referencePrice: asset.price,
+    });
+    if (!symbol) return MARKET_ASSETS.map(quote);
     const asset = findMarketAsset(symbol);
     if (!asset) throw new NotFoundException('Actif introuvable.');
-    return asset;
+    return quote(asset);
   }
 
   private async getOrCreatePortfolio(ownerId: string) {
@@ -199,11 +273,10 @@ export class TradingService {
     return portfolio;
   }
 
-  private positionView(position: TradingPosition) {
-    const asset = findMarketAsset(position.symbol);
+  private positionView(position: TradingPosition, prices: Map<string, number>) {
     const quantity = Number(position.quantity);
     const averagePrice = Number(position.averagePrice);
-    const currentPrice = asset?.price ?? 0;
+    const currentPrice = prices.get(position.symbol) ?? 0;
     const marketValue = this.money(quantity * currentPrice);
     return {
       symbol: position.symbol,
@@ -219,6 +292,7 @@ export class TradingService {
     executions: TradeExecution[],
     initialCash: number,
     portfolioCreatedAt: Date,
+    prices: Map<string, number>,
   ) {
     const holdings = new Map<string, { quantity: number; averagePrice: number }>();
     const realizedByExecution = new Map<string, number>();
@@ -259,7 +333,7 @@ export class TradingService {
       holdings.set(execution.symbol, holding);
 
       const holdingsValue = [...holdings.entries()].reduce((sum, [symbol, item]) => {
-        return sum + item.quantity * (findMarketAsset(symbol)?.price ?? 0);
+        return sum + item.quantity * (prices.get(symbol) ?? 0);
       }, 0);
       equityCurve.push({
         date: execution.executedAt,

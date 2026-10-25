@@ -21,9 +21,13 @@ import { TypeOrmModule } from '@nestjs/typeorm';
           // Hosted Supabase direct and pooled connections use SSL. The local
           // Supabase CLI connection on localhost does not.
           ssl: isHostedSupabase ? { rejectUnauthorized: false } : false,
-          // Convenient while entities don't exist yet; switch to migrations
-          // once real tables/business modules are added.
-          synchronize: process.env.NODE_ENV !== 'production',
+          // Le schéma appartient à `supabase/migrations/`, pas aux entités :
+          // la synchronisation automatique recréait les tables sans clés
+          // étrangères, contraintes CHECK ni index (voir
+          // `20261025120000_schema_integrity.sql`). Après une modification
+          // d'entité, écrire une migration puis `supabase migration up`
+          // (local) ou `supabase db push` (projet Cloud).
+          synchronize: false,
         };
       },
     }),

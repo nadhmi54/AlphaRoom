@@ -2,14 +2,19 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  Index,
   PrimaryGeneratedColumn,
 } from 'typeorm';
 
+/**
+ * Une ligne par exécution, et non par ordre : un ordre au marché de 15 oz qui
+ * rencontre 8 oz à 2 001 $ et 7 oz à 2 002 $ produit **deux** lignes, une par
+ * contrepartie. `orderId` les rattache à l'ordre qui les a générées.
+ *
+ * L'idempotence (`requestId`) est portée par `orders (owner_id, request_id)` :
+ * la contrainte unique d'origine sur `(owner_id, request_id)` empêchait les
+ * exécutions partielles et a été retirée par `20261025140000_order_book.sql`.
+ */
 @Entity({ name: 'trade_executions' })
-@Index('uq_trade_executions_owner_request', ['ownerId', 'requestId'], {
-  unique: true,
-})
 export class TradeExecution {
   @PrimaryGeneratedColumn('uuid') id!: string;
 
@@ -18,6 +23,9 @@ export class TradeExecution {
   @Column({ name: 'portfolio_id', type: 'uuid' }) portfolioId!: string;
 
   @Column({ name: 'request_id', type: 'uuid' }) requestId!: string;
+
+  @Column({ name: 'order_id', type: 'uuid', nullable: true })
+  orderId!: string | null;
 
   @Column({ type: 'varchar', length: 16 }) symbol!: string;
 

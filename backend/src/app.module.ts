@@ -6,6 +6,7 @@ import { HealthModule } from './health/health.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { UsersModule } from './users/users.module.js';
 import { TradingModule } from './trading/trading.module.js';
+import { OrderBookModule } from './order-book/order-book.module.js';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { TradingModule } from './trading/trading.module.js';
     AuthModule,
     UsersModule,
     TradingModule,
+    OrderBookModule,
     // Domain modules (marché & exécution, portefeuille & risque, IA,
     // stress testing...) plug in here as they're built — see the README's
     // "Modules fonctionnels" table for the 6 modules this maps to.
