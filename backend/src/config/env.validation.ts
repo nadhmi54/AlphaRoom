@@ -32,6 +32,17 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   SUPABASE_SERVICE_ROLE_KEY?: string;
+
+  // Clé gratuite finnhub.io : flux temps réel des actions (AAPL). Sans elle,
+  // les actions restent en simulation.
+  @IsOptional()
+  @IsString()
+  FINNHUB_API_KEY?: string;
+
+  // "false" coupe le service de prix en temps réel.
+  @IsOptional()
+  @IsString()
+  MARKET_DATA_ENABLED?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>) {
