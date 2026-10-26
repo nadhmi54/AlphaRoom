@@ -57,15 +57,15 @@ function describeResult(result, unit) {
 
 /**
  * Carnet d'ordres de M1 : sélection de l'actif, bids en vert, asks en rouge,
- * spread au milieu, mise à jour en direct, passage d'ordres au marché ou
- * limite et annulation des ordres en attente.
+ * spread au milieu, mise à jour en direct, passage d'ordres limite et
+ * annulation des ordres en attente. Les ordres au marché passent par
+ * l'ordre rapide (QuickTrade).
  */
 export default function OrderBookPanel({ symbol, assets = [], onSymbolChange, onExecuted }) {
   const asset = assets.find((item) => item.symbol === symbol);
   const unit = asset?.unit ?? "unités";
   const { book, orders, error, loading, lastSync, refresh } = useOrderBook(symbol);
   const [side, setSide] = useState("buy");
-  const [type, setType] = useState("limit");
   const [quantity, setQuantity] = useState("1");
   const [limitPrice, setLimitPrice] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -91,20 +91,20 @@ export default function OrderBookPanel({ symbol, assets = [], onSymbolChange, on
 
   const units = Number(quantity);
   const limit = Number(limitPrice);
-  const referencePrice = type === "limit" && limit > 0 ? limit : (book?.lastPrice ?? 0);
+  const referencePrice = limit > 0 ? limit : (book?.lastPrice ?? 0);
   const estimate =
     Number.isFinite(units) && units > 0 ? units * referencePrice : 0;
   const canSubmit =
     Boolean(book) &&
     Number.isFinite(units) &&
     units > 0 &&
-    (type === "market" || (Number.isFinite(limit) && limit > 0)) &&
+    Number.isFinite(limit) &&
+    limit > 0 &&
     !submitting;
 
   function pickLevel(levelSide, levelPrice) {
     // Cliquer un ask = acheter à ce prix, cliquer un bid = vendre.
     setSide(levelSide === "sell" ? "buy" : "sell");
-    setType("limit");
     setLimitPrice(String(levelPrice));
   }
 
@@ -118,9 +118,9 @@ export default function OrderBookPanel({ symbol, assets = [], onSymbolChange, on
       const result = await placeBookOrder({
         symbol,
         side,
-        type,
+        type: "limit",
         quantity: units,
-        limitPrice: type === "limit" ? limit : undefined,
+        limitPrice: limit,
         requestId: crypto.randomUUID(),
       });
       setNotice(describeResult(result, unit));
@@ -242,10 +242,6 @@ export default function OrderBookPanel({ symbol, assets = [], onSymbolChange, on
                 Dernier prix exécuté{asset ? ` · ${asset.category} · unité : ${unit}` : ""}
               </p>
 
-              <div className="ob-toggle" role="group" aria-label="Type d’ordre">
-                <button type="button" className={type === "limit" ? "selected" : ""} onClick={() => setType("limit")}>Limite</button>
-                <button type="button" className={type === "market" ? "selected" : ""} onClick={() => setType("market")}>Marché</button>
-              </div>
               <div className="ob-toggle ob-toggle--side" role="group" aria-label="Sens de l’ordre">
                 <button type="button" className={`ob-buy${side === "buy" ? " selected" : ""}`} onClick={() => setSide("buy")}>Acheter</button>
                 <button type="button" className={`ob-sell${side === "sell" ? " selected" : ""}`} onClick={() => setSide("sell")}>Vendre</button>
@@ -264,20 +260,18 @@ export default function OrderBookPanel({ symbol, assets = [], onSymbolChange, on
                 />
               </label>
 
-              {type === "limit" && (
-                <label className="ob-field" htmlFor="ob-price">
-                  Prix limite <span>(USD)</span>
-                  <input
-                    id="ob-price"
-                    type="number"
-                    min="0.0001"
-                    step="0.0001"
-                    value={limitPrice}
-                    placeholder={priceFormat(book.lastPrice)}
-                    onChange={(event) => setLimitPrice(event.target.value)}
-                  />
-                </label>
-              )}
+              <label className="ob-field" htmlFor="ob-price">
+                Prix limite <span>(USD)</span>
+                <input
+                  id="ob-price"
+                  type="number"
+                  min="0.0001"
+                  step="0.0001"
+                  value={limitPrice}
+                  placeholder={priceFormat(book.lastPrice)}
+                  onChange={(event) => setLimitPrice(event.target.value)}
+                />
+              </label>
 
               <div className="ob-estimate">
                 <span>Montant estimé</span>
@@ -285,14 +279,11 @@ export default function OrderBookPanel({ symbol, assets = [], onSymbolChange, on
               </div>
 
               <button className={`ob-submit${side === "sell" ? " is-sell" : ""}`} type="submit" disabled={!canSubmit}>
-                {submitting
-                  ? "Envoi…"
-                  : `${side === "buy" ? "Acheter" : "Vendre"}${type === "market" ? " au marché" : " en limite"}`}
+                {submitting ? "Envoi…" : `${side === "buy" ? "Acheter" : "Vendre"} en limite`}
               </button>
               <p className="ob-hint">
-                {type === "market"
-                  ? "Consomme le carnet du meilleur prix au plus mauvais ; le reliquat est annulé."
-                  : "S’exécute si le prix croise le carnet, sinon reste en attente."}
+                S’exécute si le prix croise le carnet, sinon reste en attente.
+                Pour une exécution immédiate, utilise l’ordre rapide au marché.
               </p>
             </form>
           </div>
