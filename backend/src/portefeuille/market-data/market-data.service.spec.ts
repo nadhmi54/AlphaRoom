@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ConfigService } from '@nestjs/config';
 import type { DataSource } from 'typeorm';
+import type { OrderBookService } from '../order-book/order-book.service.js';
 import { MarketDataService } from './market-data.service.js';
 import { HistoryQueryDto } from './dto/history-query.dto.js';
 import { validateSync } from 'class-validator';
@@ -17,9 +18,10 @@ function build(queryImpl?: (sql: string, params?: unknown[]) => unknown) {
     transaction: async (fn: (manager: { query: typeof query }) => Promise<void>) => fn({ query }),
   } as unknown as DataSource;
   const config = { get: () => undefined } as unknown as ConfigService;
-  const service = new MarketDataService(dataSource, config);
+  const orderBook = { checkProtections: vi.fn(async () => undefined) };
+  const service = new MarketDataService(dataSource, config, orderBook as unknown as OrderBookService);
   service.feedFactory = () => [];
-  return { service, calls, query };
+  return { service, calls, query, orderBook };
 }
 
 const seeded = () => {
@@ -60,7 +62,7 @@ describe('MarketDataService', () => {
   });
 
   it('un prix réel reçu apparaît en direct dans les cotations', async () => {
-    const { service } = build();
+    const { service, orderBook } = build();
     await service.start(seeded());
     service.stop();
     const now = Date.now();
@@ -69,6 +71,7 @@ describe('MarketDataService', () => {
     const btc = service.quotes().find((q) => q.symbol === 'BTC/USD');
     expect(btc).toMatchObject({ price: 71000, source: 'live' });
     expect(btc?.spark.at(-1)).toBe(71000);
+    expect(orderBook.checkProtections).toHaveBeenCalledWith('BTC/USD', 71000);
   });
 
   it('continue de tourner si la base est indisponible', async () => {

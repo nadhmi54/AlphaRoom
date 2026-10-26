@@ -5,6 +5,7 @@ import type { Profile } from '../../users/profile.entity.js';
 import { BookQueryDto } from './dto/book-query.dto.js';
 import { OrdersQueryDto } from './dto/orders-query.dto.js';
 import { PlaceBookOrderDto } from './dto/place-book-order.dto.js';
+import { ClosePositionDto } from './dto/close-position.dto.js';
 import { OrderBookService } from './order-book.service.js';
 
 /**
@@ -32,6 +33,12 @@ export class OrderBookController {
   @Post()
   place(@CurrentProfile() profile: Profile, @Body() dto: PlaceBookOrderDto) {
     return this.book.placeOrder(profile.id, dto);
+  }
+
+  /** Ferme toute la position et libère les ordres en attente du même actif. */
+  @Post('close-position')
+  closePosition(@CurrentProfile() profile: Profile, @Body() dto: ClosePositionDto) {
+    return this.book.closePosition(profile.id, dto.symbol, dto.requestId);
   }
 
   /** Annule un ordre encore en attente. */

@@ -30,6 +30,12 @@ export class TradingPosition {
   })
   averagePrice!: string;
 
+  @Column({ name: 'stop_loss', type: 'numeric', precision: 18, scale: 4, nullable: true })
+  stopLoss!: string | null;
+
+  @Column({ name: 'take_profit', type: 'numeric', precision: 18, scale: 4, nullable: true })
+  takeProfit!: string | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
 

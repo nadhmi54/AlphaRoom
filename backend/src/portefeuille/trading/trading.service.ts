@@ -181,6 +181,10 @@ export class TradingService {
       const remaining = heldQuantity - quantity;
       position.quantity =
         Math.abs(remaining) < 0.0000005 ? '0.000000' : remaining.toFixed(6);
+      if (Math.abs(remaining) < 0.0000005) {
+        position.stopLoss = null;
+        position.takeProfit = null;
+      }
       portfolio.cash = this.money(cash + amount).toFixed(2);
     }
 

@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import { TradingPortfolio } from '../trading/portfolio.entity.js';
@@ -22,6 +22,8 @@ export interface OpenPositionView {
   symbol: string;
   quantity: number;
   averagePrice: number;
+  stopLoss: number | null;
+  takeProfit: number | null;
   currentPrice: number;
   /** Faux si l'actif n'a pas de cotation : la valeur est alors affichée à 0. */
   priceAvailable: boolean;
@@ -86,6 +88,8 @@ export class PositionsService {
         return {
           symbol: row.symbol,
           ...valuation,
+          stopLoss: row.stopLoss === null ? null : Number(row.stopLoss),
+          takeProfit: row.takeProfit === null ? null : Number(row.takeProfit),
           // Sans cotation, on n'invente pas de perte : le latent reste à 0.
           unrealizedPnl: price === undefined ? 0 : valuation.unrealizedPnl,
           unrealizedPercent: price === undefined ? 0 : valuation.unrealizedPercent,
@@ -120,6 +124,49 @@ export class PositionsService {
   async getAllocation(ownerId: string) {
     const state = await this.loadState(ownerId);
     return { currency: CURRENCY, ...computeAllocation(state.cash, state.holdings) };
+  }
+
+  async updateProtection(
+    ownerId: string,
+    symbol: string,
+    changes: { stopLoss?: number | null; takeProfit?: number | null },
+  ) {
+    if (changes.stopLoss === undefined && changes.takeProfit === undefined) {
+      throw new BadRequestException('Indiquez au moins un seuil à modifier.');
+    }
+
+    const portfolio = await this.portfolios.findOne({ where: { ownerId } });
+    if (!portfolio) throw new NotFoundException('Portefeuille introuvable.');
+    const position = await this.positions.findOne({ where: { portfolioId: portfolio.id, symbol } });
+    if (!position || Number(position.quantity) <= 0) {
+      throw new NotFoundException('Position ouverte introuvable.');
+    }
+
+    const currentPrice = (await this.prices.getPrices()).get(symbol);
+    if (currentPrice === undefined) throw new NotFoundException('Cours indisponible pour cet actif.');
+
+    const stopLoss = changes.stopLoss === undefined
+      ? position.stopLoss === null ? null : Number(position.stopLoss)
+      : changes.stopLoss;
+    const takeProfit = changes.takeProfit === undefined
+      ? position.takeProfit === null ? null : Number(position.takeProfit)
+      : changes.takeProfit;
+
+    if (stopLoss !== null && stopLoss >= currentPrice) {
+      throw new BadRequestException('Le stop-loss doit être inférieur au cours actuel.');
+    }
+    if (takeProfit !== null && takeProfit <= currentPrice) {
+      throw new BadRequestException('Le take-profit doit être supérieur au cours actuel.');
+    }
+
+    position.stopLoss = stopLoss === null ? null : stopLoss.toFixed(4);
+    position.takeProfit = takeProfit === null ? null : takeProfit.toFixed(4);
+    await this.positions.save(position);
+    return {
+      symbol,
+      stopLoss: stopLoss === null ? null : Number(position.stopLoss),
+      takeProfit: takeProfit === null ? null : Number(position.takeProfit),
+    };
   }
 
   /**

@@ -325,7 +325,7 @@ export default function M1MarchePage() {
 
           {tab === "portfolio" && (
             <>
-              <PositionsPanel refreshKey={lastSync} assets={assets} />
+              <PositionsPanel refreshKey={lastSync} assets={assets} onExecuted={syncAccount} />
               <EquityPanel account={account} />
             </>
           )}

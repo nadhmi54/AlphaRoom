@@ -16,5 +16,6 @@ import { Order } from './order.entity.js';
   imports: [TypeOrmModule.forFeature([Order, OrderBookMark]), TradingModule],
   controllers: [OrderBookController, MarketOrderCompatController],
   providers: [OrderBookService],
+  exports: [OrderBookService],
 })
 export class OrderBookModule {}

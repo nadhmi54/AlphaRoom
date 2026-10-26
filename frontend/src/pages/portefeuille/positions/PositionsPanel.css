@@ -172,6 +172,86 @@
   border-radius: 999px;
 }
 
+.pp-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px;
+}
+.pp-protection summary,
+.pp-row-actions button,
+.pp-confirm button {
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #e9edf5;
+  font: 500 12px "Space Grotesk", sans-serif;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pp-protection summary {
+  list-style: none;
+}
+.pp-protection summary::-webkit-details-marker {
+  display: none;
+}
+.pp-protection form {
+  display: grid;
+  gap: 7px;
+  min-width: 150px;
+  padding-top: 8px;
+}
+.pp-protection label {
+  display: grid;
+  gap: 3px;
+  color: #99a2b5;
+  font-size: 11px;
+}
+.pp-protection input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 5px;
+  padding: 6px;
+  background: #111722;
+  color: #eef1f7;
+  font: 12px "JetBrains Mono", monospace;
+}
+.pp-row-actions .pp-close,
+.pp-confirm .pp-close {
+  border-color: rgba(255, 107, 122, 0.35);
+  color: #ffb3bb;
+}
+.pp-action-notice,
+.pp-confirm {
+  padding: 10px 14px;
+  border: 1px solid rgba(110, 168, 254, 0.28);
+  border-radius: 8px;
+  background: rgba(110, 168, 254, 0.07);
+  color: #c4d9ff;
+  font-size: 13px;
+}
+.pp-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pp-confirm p {
+  margin: 0;
+}
+.pp-confirm > div {
+  display: flex;
+  gap: 8px;
+}
+.pp-row-actions button:disabled,
+.pp-confirm button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
 .pp-allocation {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
