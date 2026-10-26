@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Inject, Param, Patch, Query } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Patch, Query } from '@nestjs/common';
 import { Auth } from '../../users/auth.decorator.js';
 import { CurrentProfile } from '../../users/current-profile.decorator.js';
 import type { Profile } from '../../users/profile.entity.js';
@@ -22,11 +22,10 @@ export class PositionsController {
     return this.positions.getAllocation(profile.id);
   }
 
-  @Patch('positions/:symbol/protection') updateProtection(
+  @Patch('positions/protection') updateProtection(
     @CurrentProfile() profile: Profile,
-    @Param('symbol') symbol: string,
     @Body() dto: UpdateProtectionDto,
   ) {
-    return this.positions.updateProtection(profile.id, symbol, dto);
+    return this.positions.updateProtection(profile.id, dto.symbol, dto);
   }
 }

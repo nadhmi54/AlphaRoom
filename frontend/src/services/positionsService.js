@@ -8,7 +8,7 @@ export const getPositions = (status = "all") =>
 export const getAllocation = () => apiFetch("/portfolio/allocation");
 
 export const updatePositionProtection = (symbol, protection) =>
-  apiFetch(`/portfolio/positions/${encodeURIComponent(symbol)}/protection`, {
+  apiFetch("/portfolio/positions/protection", {
     method: "PATCH",
-    body: protection,
+    body: { symbol, ...protection },
   });
