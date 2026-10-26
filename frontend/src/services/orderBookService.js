@@ -14,3 +14,9 @@ export const placeBookOrder = (order) =>
 
 export const cancelBookOrder = (orderId) =>
   apiFetch(`/orders/${orderId}`, { method: "DELETE" });
+
+export const closePosition = (symbol) =>
+  apiFetch("/orders/close-position", {
+    method: "POST",
+    body: { symbol, requestId: crypto.randomUUID() },
+  });

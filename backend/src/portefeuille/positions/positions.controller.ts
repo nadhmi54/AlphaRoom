@@ -1,9 +1,10 @@
-import { Controller, Get, Inject, Query } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Patch, Query } from '@nestjs/common';
 import { Auth } from '../../users/auth.decorator.js';
 import { CurrentProfile } from '../../users/current-profile.decorator.js';
 import type { Profile } from '../../users/profile.entity.js';
 import { PositionsQueryDto } from './dto/positions-query.dto.js';
 import { PositionsService } from './positions.service.js';
+import { UpdateProtectionDto } from './dto/update-protection.dto.js';
 
 @Auth()
 @Controller('portfolio')
@@ -19,5 +20,12 @@ export class PositionsController {
 
   @Get('allocation') allocation(@CurrentProfile() profile: Profile) {
     return this.positions.getAllocation(profile.id);
+  }
+
+  @Patch('positions/protection') updateProtection(
+    @CurrentProfile() profile: Profile,
+    @Body() dto: UpdateProtectionDto,
+  ) {
+    return this.positions.updateProtection(profile.id, dto.symbol, dto);
   }
 }

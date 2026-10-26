@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
+import { OrderBookService } from '../order-book/order-book.service.js';
 import { MARKET_ASSETS, findMarketAsset } from '../trading/market-assets.js';
 import { BinanceFeed } from './binance-feed.js';
 import { FinnhubFeed } from './finnhub-feed.js';
@@ -61,6 +62,7 @@ export class MarketDataService implements OnModuleInit, OnModuleDestroy {
   constructor(
     @Inject(DataSource) private readonly dataSource: DataSource,
     @Inject(ConfigService) private readonly config: ConfigService,
+    private readonly orderBook: OrderBookService,
   ) {}
 
   /** Remplaçable dans les tests pour ne jamais ouvrir de vraie connexion. */
@@ -158,6 +160,9 @@ export class MarketDataService implements OnModuleInit, OnModuleDestroy {
         buffer.push({ t: now, price: state.price });
         if (buffer.length > BUFFER_SIZE) buffer.shift();
         this.buffers.set(state.symbol, buffer);
+        await this.guard('protections', () =>
+          this.orderBook.checkProtections(state.symbol, state.price),
+        );
       }
 
       await this.guard('enregistrement des prix', () => this.persist(states, now));

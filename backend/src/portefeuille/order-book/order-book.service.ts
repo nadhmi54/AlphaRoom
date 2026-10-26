@@ -1,13 +1,16 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { DataSource, In, IsNull, type EntityManager } from 'typeorm';
 import { findMarketAsset } from '../trading/market-assets.js';
 import { TradingService } from '../trading/trading.service.js';
-import type { TradingPortfolio } from '../trading/portfolio.entity.js';
+import { TradingPortfolio } from '../trading/portfolio.entity.js';
 import { TradingPosition } from '../trading/position.entity.js';
+import { getProtectionTrigger } from '../positions/protection-trigger.js';
 import { OrderBookMark } from './order-book-mark.entity.js';
 import { Order, type OrderStatus } from './order.entity.js';
 import type { PlaceBookOrderDto } from './dto/place-book-order.dto.js';
@@ -42,6 +45,8 @@ const ADVISORY_NAMESPACE = 'alpharoom.order_book';
 
 @Injectable()
 export class OrderBookService {
+  private readonly logger = new Logger(OrderBookService.name);
+
   constructor(
     private readonly dataSource: DataSource,
     private readonly trading: TradingService,
@@ -108,12 +113,16 @@ export class OrderBookService {
    * dans **une seule transaction** : soit l'ordre est entièrement traité, soit
    * rien ne bouge.
    */
-  async placeOrder(ownerId: string, dto: PlaceBookOrderDto) {
-    const quantity = roundQuantity(Number(dto.quantity));
+  async placeOrder(
+    ownerId: string,
+    dto: PlaceBookOrderDto,
+    options: { cancelPending?: boolean; closePosition?: boolean } = {},
+  ) {
+    let quantity = roundQuantity(Number(dto.quantity));
     const limitPrice =
       dto.type === 'limit' ? roundPrice(Number(dto.limitPrice)) : null;
 
-    if (quantity <= 0) {
+    if (!options.closePosition && quantity <= 0) {
       throw new BadRequestException('La quantité doit être strictement positive.');
     }
     if (dto.type === 'limit' && (limitPrice === null || !(limitPrice > 0))) {
@@ -130,16 +139,40 @@ export class OrderBookService {
       });
       if (existing) return { ...this.orderResult(existing), duplicate: true };
 
+      if (options.cancelPending) {
+        await this.cancelPending(manager, ownerId, dto.symbol);
+      }
+
       // Sans liquidité de départ, un premier utilisateur ne pourrait jamais
       // traiter : le carnet se réalimente avant l'appariement.
       await this.ensureLiquidity(manager, dto.symbol);
       const portfolio = await this.trading.lockPortfolio(manager, ownerId);
 
+      if (options.closePosition) {
+        const position = await manager.getRepository(TradingPosition).findOne({
+          where: { portfolioId: portfolio.id, symbol: dto.symbol },
+        });
+        quantity = roundQuantity(Number(position?.quantity ?? 0));
+        if (quantity <= 0) throw new BadRequestException('Aucune position ouverte à fermer.');
+      }
+
+      if (dto.side === 'sell') {
+        await this.assertAvailableQuantity(manager, ownerId, portfolio, dto.symbol, quantity);
+      }
+
       const makerOrders = await this.openOrders(manager, dto.symbol);
-      const plan = matchOrder(
-        { ownerId, side: dto.side, type: dto.type, quantity, limitPrice },
-        this.toResting(makerOrders),
-      );
+      let plan: MatchPlan;
+      try {
+        plan = matchOrder(
+          { ownerId, side: dto.side, type: dto.type, quantity, limitPrice },
+          this.toResting(makerOrders),
+        );
+      } catch (error) {
+        if (error instanceof Error && error.message.startsWith('Exécution trop petite')) {
+          throw new BadRequestException(error.message);
+        }
+        throw error;
+      }
 
       await this.assertFunding(manager, ownerId, portfolio, dto, quantity, limitPrice, plan);
 
@@ -184,6 +217,87 @@ export class OrderBookService {
 
       return this.orderView(order);
     });
+  }
+
+  async closePosition(ownerId: string, symbol: string, requestId: string) {
+    const portfolio = await this.dataSource.getRepository(TradingPortfolio).findOne({ where: { ownerId } });
+    if (!portfolio) throw new NotFoundException('Portefeuille introuvable.');
+    const initial = await this.dataSource.getRepository(TradingPosition).findOne({
+      where: { portfolioId: portfolio.id, symbol },
+    });
+    if (Number(initial?.quantity ?? 0) <= 0) {
+      throw new BadRequestException('Aucune position ouverte à fermer.');
+    }
+
+    const orders: ReturnType<typeof this.orderResult>[] = [];
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const result = await this.placeOrder(
+        ownerId,
+        {
+          symbol,
+          side: 'sell',
+          type: 'market',
+          quantity: 0.000001,
+          requestId: attempt === 0 ? requestId : randomUUID(),
+        },
+        { cancelPending: true, closePosition: true },
+      );
+      if (result.filledQuantity <= 0) {
+        throw new BadRequestException('Le carnet ne dispose plus de liquidité pour fermer la position.');
+      }
+      orders.push(result);
+
+      const current = await this.dataSource.getRepository(TradingPosition).findOne({
+        where: { portfolioId: portfolio.id, symbol },
+      });
+      if (Number(current?.quantity ?? 0) <= 0) {
+        return {
+          symbol,
+          status: 'closed',
+          filledQuantity: orders.reduce((sum, order) => sum + order.filledQuantity, 0),
+          orders: orders.map((order) => order.order),
+          fills: orders.flatMap((order) => order.fills),
+        };
+      }
+    }
+
+    throw new BadRequestException('La position n’a pas pu être fermée intégralement.');
+  }
+
+  /** Exécute à la prochaine cotation toute protection dont le seuil est atteint. */
+  async checkProtections(symbol: string, price: number) {
+    const positions = (await this.dataSource.query(
+      `select p.owner_id as "ownerId", tp.quantity,
+              tp.stop_loss as "stopLoss", tp.take_profit as "takeProfit"
+         from public.trading_positions tp
+         join public.trading_portfolios p on p.id = tp.portfolio_id
+        where tp.symbol = $1 and tp.quantity > 0
+          and ((tp.stop_loss is not null and $2 <= tp.stop_loss)
+            or (tp.take_profit is not null and $2 >= tp.take_profit))`,
+      [symbol, price],
+    )) as Array<{
+      ownerId: string;
+      quantity: string;
+      stopLoss: string | null;
+      takeProfit: string | null;
+    }>;
+
+    for (const position of positions) {
+      const trigger = getProtectionTrigger(price, {
+        stopLoss: position.stopLoss === null ? null : Number(position.stopLoss),
+        takeProfit: position.takeProfit === null ? null : Number(position.takeProfit),
+      });
+      if (!trigger) continue;
+
+      try {
+        await this.closePosition(position.ownerId, symbol, randomUUID());
+        this.logger.log(`${trigger} exécuté pour ${symbol} au cours ${price}.`);
+      } catch (error) {
+        this.logger.error(
+          `Échec d'exécution ${trigger} pour ${symbol}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
   }
 
   /**
@@ -322,15 +436,25 @@ export class OrderBookService {
       return;
     }
 
+    await this.assertAvailableQuantity(manager, ownerId, portfolio, dto.symbol, quantity);
+  }
+
+  private async assertAvailableQuantity(
+    manager: EntityManager,
+    ownerId: string,
+    portfolio: TradingPortfolio,
+    symbol: string,
+    quantity: number,
+  ) {
     const position = await manager.getRepository(TradingPosition).findOne({
-      where: { portfolioId: portfolio.id, symbol: dto.symbol },
+      where: { portfolioId: portfolio.id, symbol },
     });
     const held = Number(position?.quantity ?? 0);
-    const committed = await this.reservedQuantity(manager, ownerId, dto.symbol);
+    const committed = await this.reservedQuantity(manager, ownerId, symbol);
     const available = roundQuantity(held - committed);
     if (quantity > available + 0.0000005) {
       throw new BadRequestException(
-        `Quantité insuffisante : vous détenez ${available} ${this.asset(dto.symbol).unit} disponibles.`,
+        `Quantité insuffisante : vous détenez ${available} ${this.asset(symbol).unit} disponibles.`,
       );
     }
   }
@@ -360,6 +484,20 @@ export class OrderBookService {
     return roundQuantity(
       open.reduce((sum, order) => sum + Number(order.remainingQuantity), 0),
     );
+  }
+
+  private async cancelPending(manager: EntityManager, ownerId: string, symbol: string) {
+    const repo = manager.getRepository(Order);
+    const orders = await repo.find({
+      where: { ownerId, symbol, status: In(OPEN_STATUSES) },
+    });
+    const now = new Date();
+    for (const order of orders) {
+      order.status = 'cancelled';
+      order.closedAt = now;
+      order.updatedAt = now;
+      await repo.save(order);
+    }
   }
 
   // ---------------------------------------------------------------------------

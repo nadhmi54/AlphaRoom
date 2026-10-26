@@ -3,10 +3,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import PositionsPanel from "./PositionsPanel.jsx";
 import { getAllocation, getPositions } from "../../../services/positionsService.js";
 import { ApiError } from "../../../services/apiClient.js";
+import { updatePositionProtection } from "../../../services/positionsService.js";
+import { closePosition } from "../../../services/orderBookService.js";
 
 vi.mock("../../../services/positionsService.js", () => ({
   getPositions: vi.fn(),
   getAllocation: vi.fn(),
+  updatePositionProtection: vi.fn(),
+}));
+
+vi.mock("../../../services/orderBookService.js", () => ({
+  closePosition: vi.fn(),
 }));
 
 const positionsResponse = {
@@ -74,6 +81,8 @@ describe("PositionsPanel", () => {
     vi.clearAllMocks();
     getPositions.mockResolvedValue(positionsResponse);
     getAllocation.mockResolvedValue(allocationResponse());
+    updatePositionProtection.mockResolvedValue({});
+    closePosition.mockResolvedValue({});
   });
 
   it("affiche le résumé et les positions ouvertes avec leur P&L latent", async () => {
@@ -142,5 +151,41 @@ describe("PositionsPanel", () => {
     getPositions.mockRejectedValue(new ApiError(401, "Unauthorized"));
     render(<PositionsPanel refreshKey={1} />);
     expect(await screen.findByRole("alert")).toHaveTextContent("Connectez-vous");
+  });
+
+  it("enregistre les protections de la position puis resynchronise le portefeuille", async () => {
+    const onExecuted = vi.fn();
+    render(<PositionsPanel refreshKey={1} onExecuted={onExecuted} />);
+    await screen.findByText("AAPL");
+
+    fireEvent.click(screen.getByText("Protections"));
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Stop-loss AAPL" }), {
+      target: { value: "190" },
+    });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Take-profit AAPL" }), {
+      target: { value: "240" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Enregistrer" }));
+
+    await waitFor(() =>
+      expect(updatePositionProtection).toHaveBeenCalledWith("AAPL", {
+        stopLoss: 190,
+        takeProfit: 240,
+      }),
+    );
+    expect(onExecuted).toHaveBeenCalledOnce();
+  });
+
+  it("demande confirmation avant la fermeture au marché", async () => {
+    const onExecuted = vi.fn();
+    render(<PositionsPanel refreshKey={1} onExecuted={onExecuted} />);
+    await screen.findByText("AAPL");
+
+    fireEvent.click(screen.getByRole("button", { name: "Fermer" }));
+    expect(screen.getByRole("alertdialog")).toHaveTextContent("Vendre toute la position AAPL");
+    fireEvent.click(screen.getByRole("button", { name: "Confirmer la fermeture" }));
+
+    await waitFor(() => expect(closePosition).toHaveBeenCalledWith("AAPL"));
+    expect(onExecuted).toHaveBeenCalledOnce();
   });
 });

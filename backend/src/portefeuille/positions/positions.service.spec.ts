@@ -12,7 +12,15 @@ import { PriceSource } from './price-source.js';
 const PORTFOLIO = { id: 'pf1', ownerId: 'u1', cash: '90000.00' } as TradingPortfolio;
 
 function position(symbol: string, quantity: string, averagePrice: string) {
-  return { id: `p-${symbol}`, portfolioId: 'pf1', symbol, quantity, averagePrice } as TradingPosition;
+  return {
+    id: `p-${symbol}`,
+    portfolioId: 'pf1',
+    symbol,
+    quantity,
+    averagePrice,
+    stopLoss: null,
+    takeProfit: null,
+  } as TradingPosition;
 }
 
 function execution(
@@ -44,7 +52,11 @@ function build(options: {
   prices?: Record<string, number>;
 }) {
   const portfolios = { findOne: async () => options.portfolio ?? null };
-  const positions = { find: async () => options.positions ?? [] };
+  const positions = {
+    find: async () => options.positions ?? [],
+    findOne: async () => options.positions?.[0] ?? null,
+    save: async (row: TradingPosition) => row,
+  };
   const executions = { find: async () => options.executions ?? [] };
   const prices = {
     getPrices: async () => new Map(Object.entries(options.prices ?? {})),
@@ -176,6 +188,28 @@ describe('PositionsService', () => {
     expect(allocation.status).toBe('warning');
     expect(allocation.concentratedSymbols).toEqual(['BTC/USD']);
     expect(allocation.slices[0]).toMatchObject({ key: 'CASH', weightPercent: 40 });
+  });
+
+  it('configure un stop-loss et un take-profit autour du cours actuel', async () => {
+    const row = position('AAPL', '10.000000', '237.2500');
+    const service = build({ portfolio: PORTFOLIO, positions: [row], prices: { AAPL: 260 } });
+    await expect(
+      service.updateProtection('u1', 'AAPL', { stopLoss: 240, takeProfit: 280 }),
+    ).resolves.toEqual({ symbol: 'AAPL', stopLoss: 240, takeProfit: 280 });
+    expect(row.stopLoss).toBe('240.0000');
+    expect(row.takeProfit).toBe('280.0000');
+  });
+
+  it('refuse les protections placées du mauvais côté du cours', async () => {
+    const service = build({
+      portfolio: PORTFOLIO,
+      positions: [position('AAPL', '10.000000', '237.2500')],
+      prices: { AAPL: 260 },
+    });
+    await expect(service.updateProtection('u1', 'AAPL', { stopLoss: 260 }))
+      .rejects.toMatchObject({ status: 400 });
+    await expect(service.updateProtection('u1', 'AAPL', { takeProfit: 250 }))
+      .rejects.toMatchObject({ status: 400 });
   });
 });
 

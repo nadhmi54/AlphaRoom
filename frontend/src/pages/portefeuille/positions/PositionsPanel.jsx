@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import usePositions from "./usePositions.js";
+import { closePosition } from "../../../services/orderBookService.js";
+import { updatePositionProtection } from "../../../services/positionsService.js";
 import "./PositionsPanel.css";
 
 const money = (value) =>
@@ -99,7 +101,63 @@ function AllocationView({ allocation }) {
   );
 }
 
-function OpenTable({ rows, assetBySymbol }) {
+function ProtectionControls({ row, busy, onSave, onClose }) {
+  const [stopLoss, setStopLoss] = useState(row.stopLoss ?? "");
+  const [takeProfit, setTakeProfit] = useState(row.takeProfit ?? "");
+
+  useEffect(() => {
+    setStopLoss(row.stopLoss ?? "");
+    setTakeProfit(row.takeProfit ?? "");
+  }, [row.stopLoss, row.takeProfit]);
+
+  return (
+    <div className="pp-row-actions">
+      <details className="pp-protection">
+        <summary>Protections</summary>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            onSave({
+              stopLoss: stopLoss === "" ? null : Number(stopLoss),
+              takeProfit: takeProfit === "" ? null : Number(takeProfit),
+            });
+          }}
+        >
+          <label>
+            Stop-loss
+            <input
+              aria-label={`Stop-loss ${row.symbol}`}
+              type="number"
+              min="0.0001"
+              step="0.0001"
+              value={stopLoss}
+              onChange={(event) => setStopLoss(event.target.value)}
+              placeholder="Désactivé"
+            />
+          </label>
+          <label>
+            Take-profit
+            <input
+              aria-label={`Take-profit ${row.symbol}`}
+              type="number"
+              min="0.0001"
+              step="0.0001"
+              value={takeProfit}
+              onChange={(event) => setTakeProfit(event.target.value)}
+              placeholder="Désactivé"
+            />
+          </label>
+          <button type="submit" disabled={busy}>Enregistrer</button>
+        </form>
+      </details>
+      <button type="button" className="pp-close" onClick={onClose} disabled={busy}>
+        Fermer
+      </button>
+    </div>
+  );
+}
+
+function OpenTable({ rows, assetBySymbol, busySymbol, onSave, onClose }) {
   if (rows.length === 0) {
     return (
       <p className="pp-empty">
@@ -119,6 +177,7 @@ function OpenTable({ rows, assetBySymbol }) {
             <th>Valeur</th>
             <th>P&L latent</th>
             <th>Poids</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -147,6 +206,14 @@ function OpenTable({ rows, assetBySymbol }) {
                     <span style={{ width: `${Math.min(row.weightPercent, 100)}%` }} />
                   </div>
                   <small>{percent(row.weightPercent)}</small>
+                </td>
+                <td data-label="Actions">
+                  <ProtectionControls
+                    row={row}
+                    busy={busySymbol === row.symbol}
+                    onSave={(protection) => onSave(row.symbol, protection)}
+                    onClose={() => onClose(row.symbol)}
+                  />
                 </td>
               </tr>
             );
@@ -216,9 +283,13 @@ const TABS = [
  * `refreshKey` : valeur qui change quand le portefeuille est resynchronisé.
  * `assets` : liste des actifs du marché (noms et unités), optionnelle.
  */
-export default function PositionsPanel({ refreshKey, assets = [] }) {
-  const { positions, allocation, loading, error } = usePositions(refreshKey);
+export default function PositionsPanel({ refreshKey, assets = [], onExecuted }) {
+  const { positions, allocation, loading, error, reload } = usePositions(refreshKey);
   const [tab, setTab] = useState("open");
+  const [busySymbol, setBusySymbol] = useState(null);
+  const [closeSymbol, setCloseSymbol] = useState(null);
+  const [actionError, setActionError] = useState("");
+  const [actionNotice, setActionNotice] = useState("");
   const assetBySymbol = new Map(assets.map((asset) => [asset.symbol, asset]));
 
   const summary = positions?.summary;
@@ -226,6 +297,41 @@ export default function PositionsPanel({ refreshKey, assets = [] }) {
   const closed = positions?.closed ?? [];
   const warning = allocation?.status === "warning";
   const counts = { open: summary?.openCount ?? 0, closed: summary?.closedCount ?? 0 };
+
+  async function saveProtection(symbol, protection) {
+    setBusySymbol(symbol);
+    setActionError("");
+    setActionNotice("");
+    try {
+      await updatePositionProtection(symbol, protection);
+      await reload();
+      onExecuted?.();
+      setActionNotice(`Protections enregistrées pour ${symbol}.`);
+    } catch (requestError) {
+      setActionError(requestError.message || "Impossible d’enregistrer les protections.");
+    } finally {
+      setBusySymbol(null);
+    }
+  }
+
+  async function confirmClose() {
+    const symbol = closeSymbol;
+    if (!symbol) return;
+    setBusySymbol(symbol);
+    setActionError("");
+    setActionNotice("");
+    try {
+      await closePosition(symbol);
+      await reload();
+      onExecuted?.();
+      setActionNotice(`Position ${symbol} fermée au marché.`);
+    } catch (requestError) {
+      setActionError(requestError.message || "Impossible de fermer la position.");
+    } finally {
+      setCloseSymbol(null);
+      setBusySymbol(null);
+    }
+  }
 
   return (
     <section className="m1-card pp-panel" aria-busy={loading} aria-label="Positions et répartition">
@@ -245,6 +351,22 @@ export default function PositionsPanel({ refreshKey, assets = [] }) {
       {error && (
         <div className="pp-error" role="alert">
           {error}
+        </div>
+      )}
+
+      {actionError && <div className="pp-error" role="alert">{actionError}</div>}
+      {actionNotice && <div className="pp-action-notice" role="status">{actionNotice}</div>}
+      {closeSymbol && (
+        <div className="pp-confirm" role="alertdialog" aria-labelledby="pp-close-title">
+          <p id="pp-close-title">Vendre toute la position {closeSymbol} au marché ?</p>
+          <div>
+            <button type="button" onClick={() => setCloseSymbol(null)} disabled={busySymbol === closeSymbol}>
+              Annuler
+            </button>
+            <button type="button" className="pp-close" onClick={confirmClose} disabled={busySymbol === closeSymbol}>
+              Confirmer la fermeture
+            </button>
+          </div>
         </div>
       )}
 
@@ -299,7 +421,13 @@ export default function PositionsPanel({ refreshKey, assets = [] }) {
         {loading && !positions ? (
           <p className="pp-empty">Chargement…</p>
         ) : tab === "open" ? (
-          <OpenTable rows={open} assetBySymbol={assetBySymbol} />
+          <OpenTable
+            rows={open}
+            assetBySymbol={assetBySymbol}
+            busySymbol={busySymbol}
+            onSave={saveProtection}
+            onClose={setCloseSymbol}
+          />
         ) : tab === "closed" ? (
           <ClosedTable rows={closed} />
         ) : (
