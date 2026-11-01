@@ -228,6 +228,7 @@ export default function M1MarchePage() {
   const tabs = [
     { id: "trader", label: "Trader" },
     { id: "portfolio", label: "Portefeuille", badge: account ? openPositions : null },
+    { id: "risk", label: "Risque" },
     { id: "history", label: "Historique", badge: account?.history?.total ?? null },
   ];
 
@@ -287,7 +288,7 @@ export default function M1MarchePage() {
 
         {tab === "trader" && (
           <p className="ck-hints" aria-hidden="true">
-            <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> onglets · <kbd>F</kbd> plein écran · <kbd>B</kbd> acheter · <kbd>S</kbd> vendre
+            <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> onglets · <kbd>F</kbd> plein écran · <kbd>B</kbd> acheter · <kbd>S</kbd> vendre
           </p>
         )}
 
@@ -330,6 +331,13 @@ export default function M1MarchePage() {
               <PositionsPanel refreshKey={lastSync} assets={assets} onExecuted={syncAccount} />
               <EquityPanel account={account} />
             </>
+          )}
+
+          {tab === "risk" && (
+            <PerformanceDashboard
+              portfolioId={account?.portfolio?.id}
+              initialCash={account?.portfolio?.initialCash}
+            />
           )}
 
           {tab === "history" && (
