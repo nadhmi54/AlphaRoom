@@ -10,6 +10,7 @@ import { OrderBookModule } from './portefeuille/order-book/order-book.module.js'
 import { PositionsModule } from './portefeuille/positions/positions.module.js';
 import { MarketDataModule } from './portefeuille/market-data/market-data.module.js';
 import { GameRoomModule } from './game-room/game-room.module.js';
+import { PerformanceModule } from './portefeuille/performance/performance.module.js';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { GameRoomModule } from './game-room/game-room.module.js';
     PositionsModule,
     MarketDataModule,
     GameRoomModule,
+    PerformanceModule,
   ],
 })
 export class AppModule {}
