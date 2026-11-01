@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "../../../services/apiClient.js";
-import { getHistory, getQuotes } from "../../../services/marketService.js";
+import { getHistory, getQuotes, getSpotPrice } from "../../../services/marketService.js";
 
-// Les prix changent chaque seconde côté serveur : on les relit à la même cadence.
+// Les 4 actifs natifs gérés par le moteur de prix interne.
+const NATIVE_SYMBOLS = new Set(["XAU/USD", "EUR/USD", "BTC/USD", "AAPL"]);
+
 export const QUOTES_REFRESH_MS = 1000;
+const CUSTOM_REFRESH_MS = 2000;
 
-// Durée affichée et finesse des points de chaque période (voir le backend).
 export const RANGES = {
-  "5m": { label: "5 min", windowMs: 5 * 60_000, stepMs: 1000 },
-  "1h": { label: "1 h", windowMs: 60 * 60_000, stepMs: 10_000 },
-  "24h": { label: "24 h", windowMs: 24 * 60 * 60_000, stepMs: 5 * 60_000 },
+  "5m":  { label: "5 min", windowMs: 5 * 60_000,        stepMs: 1_000      },
+  "1h":  { label: "1 h",   windowMs: 60 * 60_000,       stepMs: 10_000     },
+  "24h": { label: "24 h",  windowMs: 24 * 60 * 60_000,  stepMs: 5 * 60_000 },
 };
 
 const describeError = (error) =>
@@ -19,22 +21,37 @@ const describeError = (error) =>
 
 /**
  * Prix en direct + courbe de l'actif choisi.
- * - `quotes` est relu chaque seconde ;
- * - `series` part de l'historique du serveur, puis chaque nouveau prix est
- *   ajouté à la fin : la courbe avance toute seule, sans recharger.
+ *
+ * Retourne :
+ *   - `quotes`    : [actif courant uniquement] — pour l'en-tête du graphique.
+ *   - `allQuotes` : tous les actifs natifs — pour le TickerTape.
+ *   - `series`    : points de la courbe.
+ *
+ * Mode natif  (XAU/USD, BTC/USD, EUR/USD, AAPL) :
+ *   - GET /market/quotes toutes les secondes.
+ *   - GET /market/history pour la courbe historique.
+ *
+ * Mode custom (paire Binance ex. BNBUSDT) :
+ *   - GET /market/spot toutes les 2 s.
+ *   - GET /market/history → klines Binance REST pour la courbe.
  */
 export default function useLiveMarket(symbol, range) {
-  const [quotes, setQuotes] = useState([]);
-  const [series, setSeries] = useState([]);
-  const [error, setError] = useState("");
-  const [loadingSeries, setLoadingSeries] = useState(true);
+  const [nativeQuotes, setNativeQuotes]     = useState([]);
+  const [series, setSeries]                 = useState([]);
+  const [error, setError]                   = useState("");
+  const [loadingSeries, setLoadingSeries]   = useState(true);
+  // `customQuote` utilise le symbole Binance brut (ex. "BNBUSDT") comme clé
+  // pour que selected = quotes.find(q => q.symbol === symbol) fonctionne.
+  const [customQuote, setCustomQuote]       = useState(null);
+
+  const isCustom = Boolean(symbol) && !NATIVE_SYMBOLS.has(symbol);
 
   const inFlight = useRef(false);
-  const stopped = useRef(false);
-  const current = useRef({ symbol, range });
+  const stopped  = useRef(false);
+  const current  = useRef({ symbol, range });
   current.current = { symbol, range };
 
-  // Historique de la période : au changement d'actif ou de période.
+  // ── Historique ────────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
     setLoadingSeries(true);
@@ -42,45 +59,48 @@ export default function useLiveMarket(symbol, range) {
     getHistory(symbol, range)
       .then((history) => {
         if (cancelled) return;
-        setSeries(history.points.map((p) => ({ t: Date.parse(p.t), price: p.price })));
+        const pts = (history.points ?? []).map((p) => ({
+          t: typeof p.t === "number" ? p.t : Date.parse(p.t),
+          price: p.price,
+        }));
+        setSeries(pts);
       })
-      .catch((requestError) => {
-        if (!cancelled) setError(describeError(requestError));
+      .catch((err) => {
+        if (!cancelled) setError(describeError(err));
       })
       .finally(() => {
         if (!cancelled) setLoadingSeries(false);
       });
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [symbol, range]);
 
-  const poll = useCallback(async () => {
+  // ── Polling NATIF ─────────────────────────────────────────────────────────
+  const pollNative = useCallback(async () => {
     if (inFlight.current || stopped.current) return;
     inFlight.current = true;
     try {
       const { quotes: next } = await getQuotes();
-      setQuotes(next);
+      setNativeQuotes(next);
       setError("");
+
       const { symbol: wanted, range: wantedRange } = current.current;
-      const quote = next.find((item) => item.symbol === wanted);
-      if (quote) {
-        const t = Date.parse(quote.updatedAt);
-        const { windowMs, stepMs } = RANGES[wantedRange];
-        setSeries((points) => {
-          const last = points.at(-1);
-          if (last && t - last.t < stepMs) return points;
-          const grown = [...points, { t, price: quote.price }];
-          const oldest = t - windowMs;
-          let start = 0;
-          while (start < grown.length - 2 && grown[start].t < oldest) start += 1;
-          return start ? grown.slice(start) : grown;
-        });
-      }
-    } catch (requestError) {
-      // Une 401 ne se réglera pas en réessayant : on arrête d'interroger l'API.
-      stopped.current = requestError instanceof ApiError && requestError.status === 401;
-      setError(describeError(requestError));
+      if (!NATIVE_SYMBOLS.has(wanted)) return;
+      const quote = next.find((q) => q.symbol === wanted);
+      if (!quote) return;
+      const t = Date.parse(quote.updatedAt);
+      const { windowMs, stepMs } = RANGES[wantedRange];
+      setSeries((pts) => {
+        const last = pts.at(-1);
+        if (last && t - last.t < stepMs) return pts;
+        const grown = [...pts, { t, price: quote.price }];
+        const oldest = t - windowMs;
+        let s = 0;
+        while (s < grown.length - 2 && grown[s].t < oldest) s++;
+        return s ? grown.slice(s) : grown;
+      });
+    } catch (err) {
+      stopped.current = err instanceof ApiError && err.status === 401;
+      setError(describeError(err));
     } finally {
       inFlight.current = false;
     }
@@ -88,10 +108,8 @@ export default function useLiveMarket(symbol, range) {
 
   useEffect(() => {
     stopped.current = false;
-    poll();
-    const tick = () => {
-      if (document.visibilityState === "visible") poll();
-    };
+    pollNative();
+    const tick = () => { if (document.visibilityState === "visible") pollNative(); };
     const timer = window.setInterval(tick, QUOTES_REFRESH_MS);
     document.addEventListener("visibilitychange", tick);
     return () => {
@@ -99,7 +117,72 @@ export default function useLiveMarket(symbol, range) {
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", tick);
     };
-  }, [poll]);
+  }, [pollNative]);
 
-  return { quotes, series, error, loadingSeries };
+  // ── Polling CUSTOM (Binance REST) ─────────────────────────────────────────
+  useEffect(() => {
+    if (!isCustom) {
+      setCustomQuote(null);
+      return undefined;
+    }
+    let cancelled = false;
+
+    const pollCustom = async () => {
+      if (cancelled) return;
+      try {
+        const spot = await getSpotPrice(symbol);
+        if (cancelled || !spot.found) return;
+        const t = Date.now();
+        // On garde symbol (ex. "BNBUSDT") comme clé — pas displaySymbol ("BNB/USDT")
+        // pour que selected = quotes.find(q => q.symbol === symbol) fonctionne.
+        setCustomQuote({
+          symbol:        symbol,
+          name:          spot.name ?? symbol,
+          displaySymbol: spot.displaySymbol ?? symbol,
+          unit:          "unité",
+          category:      "crypto",
+          price:         spot.price,
+          source:        "live",
+          updatedAt:     spot.updatedAt,
+          changePercent: 0,
+          changeSince:   null,
+          spark:         [],
+        });
+        setError("");
+
+        const { range: wantedRange } = current.current;
+        const { windowMs, stepMs } = RANGES[wantedRange];
+        setSeries((pts) => {
+          const last = pts.at(-1);
+          if (last && t - last.t < stepMs) return pts;
+          const grown = [...pts, { t, price: spot.price }];
+          const oldest = t - windowMs;
+          let s = 0;
+          while (s < grown.length - 2 && grown[s].t < oldest) s++;
+          return s ? grown.slice(s) : grown;
+        });
+      } catch {
+        // silencieux
+      }
+    };
+
+    pollCustom();
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") pollCustom();
+    }, CUSTOM_REFRESH_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [symbol, isCustom]);
+
+  // ── Quotes exposés ────────────────────────────────────────────────────────
+  // `quotes`    = [actif courant] pour l'en-tête du graphique.
+  // `allQuotes` = 4 natifs pour le TickerTape (bandeau défilant).
+  const selectedNative = nativeQuotes.find((q) => q.symbol === symbol);
+  const quotes = isCustom
+    ? (customQuote ? [customQuote] : [])
+    : (selectedNative ? [selectedNative] : []);
+
+  return { quotes, allQuotes: nativeQuotes, series, error, loadingSeries };
 }

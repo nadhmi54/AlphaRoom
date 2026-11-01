@@ -1,13 +1,27 @@
-import { IsIn, IsOptional, IsString } from 'class-validator';
-import { MARKET_ASSETS } from '../../trading/market-assets.js';
+import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 import { HISTORY_RANGES, type HistoryRange } from '../market-feed-config.js';
 
 export class HistoryQueryDto {
+  /** Symbole interne (XAU/USD, BTC/USD…) ou paire Binance (ETHUSDT, SOLUSDT…). */
   @IsString()
-  @IsIn(MARKET_ASSETS.map((asset) => asset.symbol))
+  @MaxLength(20)
   symbol!: string;
 
   @IsOptional()
   @IsIn(Object.keys(HISTORY_RANGES))
   range: HistoryRange = '5m';
+}
+
+/** DTO pour la recherche d'actifs. */
+export class SearchQueryDto {
+  @IsString()
+  @MaxLength(20)
+  q!: string;
+}
+
+/** DTO pour le prix spot d'un seul symbole Binance. */
+export class SpotQueryDto {
+  @IsString()
+  @MaxLength(20)
+  symbol!: string;
 }

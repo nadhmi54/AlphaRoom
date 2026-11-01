@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import ModuleShell from '../../components/ModuleShell/ModuleShell.jsx';
+import CoachWidget from '../../components/CoachWidget/CoachWidget.jsx';
 import { useAuth } from '../../context/useAuth.js';
 import GrHeader from './GrHeader.jsx';
 import GrPortfolio from './GrPortfolio.jsx';
@@ -721,6 +722,11 @@ export default function GameRoomPage() {
             </div>
           </div>
         )}
+
+        {/* Coach IA : Uniquement visible pour les étudiants (traders), pas pour le Meneur de Jeu.
+            On ne passe pas sessionId : le backend résout automatiquement la séance IA visible
+            pour ce trader (via listVisibleSessions), indépendamment de l'ID de la Game Room. */}
+        {!isMaster && <CoachWidget />}
       </div>
     </ModuleShell>
   );
