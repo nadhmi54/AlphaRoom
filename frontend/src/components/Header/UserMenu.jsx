@@ -74,6 +74,14 @@ export default function UserMenu() {
             <Link to="/profil" className="ar-usermenu__item" role="menuitem" onClick={() => setOpen(false)}>
               Mon profil
             </Link>
+            <Link to="/ia/mes-bilans" className="ar-usermenu__item" role="menuitem" onClick={() => setOpen(false)}>
+              Mes bilans IA
+            </Link>
+            {(profile?.role === 'game_master' || profile?.role === 'admin') && (
+              <Link to="/ia/enseignant" className="ar-usermenu__item" role="menuitem" onClick={() => setOpen(false)}>
+                Espace enseignant IA
+              </Link>
+            )}
             {profile?.role === 'admin' && (
               <Link to="/admin/utilisateurs" className="ar-usermenu__item" role="menuitem" onClick={() => setOpen(false)}>
                 Administration
