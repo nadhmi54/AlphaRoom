@@ -8,6 +8,7 @@ import { UsersModule } from './users/users.module.js';
 import { TradingModule } from './portefeuille/trading/trading.module.js';
 import { OrderBookModule } from './portefeuille/order-book/order-book.module.js';
 import { PositionsModule } from './portefeuille/positions/positions.module.js';
+import { AiModule } from './ai/ai.module.js';
 import { MarketDataModule } from './portefeuille/market-data/market-data.module.js';
 import { PerformanceModule } from './portefeuille/performance/performance.module.js';
 
@@ -26,6 +27,7 @@ import { PerformanceModule } from './portefeuille/performance/performance.module
     PositionsModule,
     MarketDataModule,
     PerformanceModule,
+    AiModule,
     // Domain modules (marché & exécution, portefeuille & risque, IA,
     // stress testing...) plug in here as they're built — see the README's
     // "Modules fonctionnels" table for the 6 modules this maps to.
