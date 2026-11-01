@@ -1,3 +1,4 @@
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { MODULES } from '../../data/modules.js';
 import './ModuleShell.css';
