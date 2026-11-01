@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { formatPrice } from '../../data/roomAssets.js';
 
 const STATUS_LABELS = {

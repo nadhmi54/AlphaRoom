@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 
 const SPEED_PRESETS = [0.5, 1, 2, 5, 12, 30];
 
@@ -310,7 +310,7 @@ export default function GrMasterPanel({
         <div className="gr-master-box gr-master-box--rollback">
           <h4>Retour en arrière (Rollback & Replay)</h4>
           <p className="gr-master-desc">
-            Restaure l'état exact du marché et des portefeuilles à une minute antérieure pour rejouer une séquence pédagogique.
+            Restaure l&apos;état exact du marché et des portefeuilles à une minute antérieure pour rejouer une séquence pédagogique.
           </p>
 
           <div className="gr-rollback-action">
@@ -356,7 +356,7 @@ export default function GrMasterPanel({
 
               {(!dashboard?.triggerPoints || dashboard.triggerPoints.length === 0) ? (
                 <small className="gr-no-triggers">
-                  Aucun choc déclenché pour l'instant. Chaque choc injecté s’enregistre ici pour permettre d’y revenir.
+                  Aucun choc déclenché pour l&apos;instant. Chaque choc injecté s&apos;enregistre ici pour permettre d&apos;y revenir.
                 </small>
               ) : (
                 <div className="gr-triggers-list">

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { formatPrice } from '../../data/roomAssets.js';
 
 const WIDTH = 900;
@@ -8,6 +8,7 @@ export default function GrChart({
   series = [],
   averageBuyPrice = null,
   currentPrice = 0,
+  // eslint-disable-next-line no-unused-vars
   events = [],
   symbol = 'XAU/USD',
   currency = '$US',

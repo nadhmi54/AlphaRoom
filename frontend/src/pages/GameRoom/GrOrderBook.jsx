@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { assetQtyDecimals, assetUnitShort, formatPrice } from '../../data/roomAssets.js';
 
 export default function GrOrderBook({ book, symbol = 'XAU/USD', currency = '$US', onSelectPrice }) {

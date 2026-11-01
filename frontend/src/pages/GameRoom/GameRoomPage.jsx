@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState, useRef } from 'react';
+﻿import { useCallback, useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import ModuleShell from '../../components/ModuleShell/ModuleShell.jsx';
 import CoachWidget from '../../components/CoachWidget/CoachWidget.jsx';
@@ -46,8 +46,9 @@ export default function GameRoomPage() {
   const [myRooms, setMyRooms] = useState([]);
   const [activeSymbol, setActiveSymbol] = useState(null);
 
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // eslint-disable-next-line no-unused-vars
+  const [_loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
   const [latestEventBanner, setLatestEventBanner] = useState(null);
 
@@ -681,7 +682,7 @@ export default function GameRoomPage() {
           <div className="gr-modal-backdrop" onClick={() => setShowJoinModal(false)}>
             <div className="gr-modal" onClick={(e) => e.stopPropagation()}>
               <h3>Rejoindre une Game Room</h3>
-              <p>Entrez le code d'accès partagé par votre formateur.</p>
+              <p>Entrez le code d&apos;accès partagé par votre formateur.</p>
               <form onSubmit={handleJoinOtherRoom}>
                 <div className="gr-field">
                   <label htmlFor="joinCode">Code de la salle</label>

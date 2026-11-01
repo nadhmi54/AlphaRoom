@@ -1,4 +1,4 @@
-import React from 'react';
+
 
 export default function GrPortfolio({ portfolio, currency = '$US' }) {
   const cash = portfolio?.cash ?? 100000;

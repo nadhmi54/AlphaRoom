@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { assetQtyDecimals, formatPrice } from '../../data/roomAssets.js';
 
 export default function GrTradePanel({
