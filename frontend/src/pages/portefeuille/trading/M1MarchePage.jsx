@@ -22,6 +22,7 @@ import LiveMarketPanel from "../market/LiveMarketPanel.jsx";
 import useLiveMarket from "../market/useLiveMarket.js";
 import OrderBookPanel from "../OrderBook/OrderBookPanel.jsx";
 import PositionsPanel from "../positions/PositionsPanel.jsx";
+import PerformanceDashboard from "../performance/PerformanceDashboard.jsx";
 
 // Intervalle du rafraîchissement automatique du portefeuille : les chiffres se
 // mettent à jour sans recharger la page.
@@ -29,7 +30,7 @@ const LIVE_REFRESH_MS = 5000;
 
 const EMPTY_FILTERS = { symbol: "", side: "", from: "", to: "" };
 const TAB_STORAGE_KEY = "alpharoom.cockpit.tab";
-const TAB_IDS = ["trader", "portfolio", "history"];
+const TAB_IDS = ["trader", "portfolio", "risk", "history"];
 
 const describeError = (requestError) =>
   requestError instanceof ApiError && requestError.status === 401
@@ -170,7 +171,8 @@ export default function M1MarchePage() {
     () => ({
       1: () => setTab("trader"),
       2: () => setTab("portfolio"),
-      3: () => setTab("history"),
+      3: () => setTab("risk"),
+      4: () => setTab("history"),
       f: () => {
         if (tab === "trader") setFocus((value) => !value);
       },
@@ -226,6 +228,7 @@ export default function M1MarchePage() {
   const tabs = [
     { id: "trader", label: "Trader" },
     { id: "portfolio", label: "Portefeuille", badge: account ? openPositions : null },
+    { id: "risk", label: "Risque" },
     { id: "history", label: "Historique", badge: account?.history?.total ?? null },
   ];
 
@@ -285,7 +288,7 @@ export default function M1MarchePage() {
 
         {tab === "trader" && (
           <p className="ck-hints" aria-hidden="true">
-            <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> onglets · <kbd>F</kbd> plein écran · <kbd>B</kbd> acheter · <kbd>S</kbd> vendre
+            <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> onglets · <kbd>F</kbd> plein écran · <kbd>B</kbd> acheter · <kbd>S</kbd> vendre
           </p>
         )}
 
@@ -328,6 +331,13 @@ export default function M1MarchePage() {
               <PositionsPanel refreshKey={lastSync} assets={assets} onExecuted={syncAccount} />
               <EquityPanel account={account} />
             </>
+          )}
+
+          {tab === "risk" && (
+            <PerformanceDashboard
+              portfolioId={account?.portfolio?.id}
+              initialCash={account?.portfolio?.initialCash}
+            />
           )}
 
           {tab === "history" && (
