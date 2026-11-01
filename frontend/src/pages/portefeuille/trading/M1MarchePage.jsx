@@ -22,6 +22,7 @@ import LiveMarketPanel from "../market/LiveMarketPanel.jsx";
 import useLiveMarket from "../market/useLiveMarket.js";
 import OrderBookPanel from "../OrderBook/OrderBookPanel.jsx";
 import PositionsPanel from "../positions/PositionsPanel.jsx";
+import PerformanceDashboard from "../performance/PerformanceDashboard.jsx";
 
 // Intervalle du rafraîchissement automatique du portefeuille : les chiffres se
 // mettent à jour sans recharger la page.
@@ -29,7 +30,7 @@ const LIVE_REFRESH_MS = 5000;
 
 const EMPTY_FILTERS = { symbol: "", side: "", from: "", to: "" };
 const TAB_STORAGE_KEY = "alpharoom.cockpit.tab";
-const TAB_IDS = ["trader", "portfolio", "history"];
+const TAB_IDS = ["trader", "portfolio", "risk", "history"];
 
 const describeError = (requestError) =>
   requestError instanceof ApiError && requestError.status === 401
@@ -170,7 +171,8 @@ export default function M1MarchePage() {
     () => ({
       1: () => setTab("trader"),
       2: () => setTab("portfolio"),
-      3: () => setTab("history"),
+      3: () => setTab("risk"),
+      4: () => setTab("history"),
       f: () => {
         if (tab === "trader") setFocus((value) => !value);
       },
