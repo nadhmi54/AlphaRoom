@@ -1,8 +1,10 @@
 import React from 'react';
+import { assetQtyDecimals, assetUnitShort, formatPrice } from '../../data/roomAssets.js';
 
 export default function GrPositions({
   positions = [],
   trades = [],
+  currency = '$US',
   onClosePosition,
   isClosing = false,
   readOnly = false,
@@ -21,7 +23,7 @@ export default function GrPositions({
           <div className="gr-empty-state">
             <p>
               {emptyMessage ||
-                'Aucune position ouverte. Utilisez la zone de trading pour acheter ou vendre de l’or.'}
+                'Aucune position ouverte. Utilisez la zone de trading pour acheter ou vendre les actifs de la salle.'}
             </p>
           </div>
         ) : (
@@ -45,14 +47,14 @@ export default function GrPositions({
                   return (
                     <tr key={pos.id}>
                       <td><strong>{pos.symbol}</strong></td>
-                      <td>{pos.quantity.toFixed(2)} oz</td>
-                      <td>{pos.averagePrice.toFixed(2)} $</td>
-                      <td>{pos.currentPrice.toFixed(2)} $</td>
+                      <td>{pos.quantity.toFixed(assetQtyDecimals(pos.symbol))} {assetUnitShort(pos.symbol)}</td>
+                      <td>{formatPrice(pos.averagePrice, pos.symbol)} {currency}</td>
+                      <td>{formatPrice(pos.currentPrice, pos.symbol)} {currency}</td>
                       <td className={isUp ? 'is-up' : 'is-down'}>
-                        <strong>{isUp ? '+' : ''}{pos.unrealizedPnl.toFixed(2)} $</strong>
+                        <strong>{isUp ? '+' : ''}{pos.unrealizedPnl.toFixed(2)} {currency}</strong>
                       </td>
-                      <td>{pos.stopLoss ? `${pos.stopLoss.toFixed(2)} $` : '—'}</td>
-                      <td>{pos.takeProfit ? `${pos.takeProfit.toFixed(2)} $` : '—'}</td>
+                      <td>{pos.stopLoss ? `${formatPrice(pos.stopLoss, pos.symbol)} ${currency}` : '—'}</td>
+                      <td>{pos.takeProfit ? `${formatPrice(pos.takeProfit, pos.symbol)} ${currency}` : '—'}</td>
                       {!readOnly && (
                         <td className="gr-text-right">
                           <button
@@ -111,10 +113,10 @@ export default function GrPositions({
                           {isBuy ? 'ACHAT' : 'VENTE'}
                         </span>
                       </td>
-                      <td>{t.quantity.toFixed(2)} oz</td>
-                      <td>{t.price.toFixed(2)} $</td>
+                      <td>{t.quantity.toFixed(assetQtyDecimals(t.symbol))} {assetUnitShort(t.symbol)}</td>
+                      <td>{formatPrice(t.price, t.symbol)} {currency}</td>
                       <td className="gr-text-right">
-                        {t.amount.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $US
+                        {t.amount.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency}
                       </td>
                     </tr>
                   );

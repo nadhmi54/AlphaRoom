@@ -14,6 +14,13 @@ vi.mock('../../context/useAuth.js', () => ({
 }));
 
 vi.mock('../../services/gameRoomService.js', () => ({
+  getMyRooms: vi.fn().mockResolvedValue({ rooms: [] }),
+  createGameRoom: vi.fn().mockResolvedValue({ id: 'room-2', name: 'Salle test', joinCode: 'ABC123' }),
+  previewCsv: vi.fn().mockResolvedValue({ valid: true, candles: [], candlesCount: 0, issues: [], issuesCount: 0, summary: {} }),
+  updateRoomConfig: vi.fn(),
+  setRoomSpeed: vi.fn().mockResolvedValue({}),
+  seekRoom: vi.fn().mockResolvedValue({}),
+  getRoomCandles: vi.fn().mockResolvedValue({ candles: [] }),
   getDemoRoom: vi.fn().mockResolvedValue({
     room: {
       id: 'demo-room-1',

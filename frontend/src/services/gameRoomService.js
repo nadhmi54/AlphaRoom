@@ -4,11 +4,50 @@ export async function getDemoRoom() {
   return apiFetch('/game-room/demo');
 }
 
-export async function createGameRoom(name, scenarioId = 'panic_tuesday') {
+// Salles créées par le Meneur de Jeu connecté.
+export async function getMyRooms() {
+  return apiFetch('/game-room/mine');
+}
+
+// payload : { name, scenarioId?, config?, source?, time? }
+export async function createGameRoom(payload) {
   return apiFetch('/game-room/create', {
     method: 'POST',
-    body: { name, scenarioId },
+    body: payload,
   });
+}
+
+// Validation serveur d'un CSV de bougies avant création de la salle.
+export async function previewCsv(content, filename) {
+  return apiFetch('/game-room/preview-csv', {
+    method: 'POST',
+    body: { content, filename },
+  });
+}
+
+export async function updateRoomConfig(roomId, payload) {
+  return apiFetch(`/game-room/${roomId}/config`, {
+    method: 'PATCH',
+    body: payload,
+  });
+}
+
+export async function setRoomSpeed(roomId, speed) {
+  return apiFetch(`/game-room/${roomId}/speed`, {
+    method: 'POST',
+    body: { speed },
+  });
+}
+
+export async function seekRoom(roomId, seconds) {
+  return apiFetch(`/game-room/${roomId}/seek`, {
+    method: 'POST',
+    body: { seconds },
+  });
+}
+
+export async function getRoomCandles(roomId, symbol, timeframe) {
+  return apiFetch(`/game-room/${roomId}/candles`, { query: { symbol, timeframe } });
 }
 
 export async function joinGameRoom(codeOrId, nickname) {
@@ -18,8 +57,8 @@ export async function joinGameRoom(codeOrId, nickname) {
   });
 }
 
-export async function getGameRoomDetails(roomId) {
-  return apiFetch(`/game-room/${roomId}`);
+export async function getGameRoomDetails(roomId, symbol) {
+  return apiFetch(`/game-room/${roomId}`, { query: { symbol } });
 }
 
 export async function getGameRoomPortfolio(roomId) {
@@ -33,7 +72,7 @@ export async function placeSimOrder(roomId, orderData) {
   });
 }
 
-export async function closeSimPosition(roomId, symbol = 'XAU/USD') {
+export async function closeSimPosition(roomId, symbol) {
   return apiFetch(`/game-room/${roomId}/close-position`, {
     method: 'POST',
     body: { symbol },

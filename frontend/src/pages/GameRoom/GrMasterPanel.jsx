@@ -1,17 +1,33 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+
+const SPEED_PRESETS = [0.5, 1, 2, 5, 12, 30];
 
 export default function GrMasterPanel({
   room,
   dashboard,
+  currency = '$US',
+  symbol = 'XAU/USD',
   onControlRoom,
   onTriggerAction,
+  onSetSpeed,
+  onSeek,
   selectedStudentId,
   onSelectStudent,
 }) {
   const [selectedMinute, setSelectedMinute] = useState('0');
   const [customNews, setCustomNews] = useState('');
+  const [speedInput, setSpeedInput] = useState(String(room?.playbackSpeed ?? 1));
+  const [seekSeconds, setSeekSeconds] = useState(room?.simElapsedSeconds ?? 0);
+  const [seekDirty, setSeekDirty] = useState(false);
 
   const status = room?.status || 'waiting';
+  const totalSeconds = room?.totalSimSeconds || 1800;
+
+  // Le curseur suit la séance, sauf pendant que l'enseignant le déplace.
+  useEffect(() => {
+    if (seekDirty) return;
+    setSeekSeconds(room?.simElapsedSeconds ?? 0);
+  }, [room?.simElapsedSeconds, seekDirty]);
 
   const handleNewsSubmit = (e) => {
     e.preventDefault();
@@ -23,6 +39,13 @@ export default function GrMasterPanel({
       payload: { custom: true },
     });
     setCustomNews('');
+  };
+
+  const applySpeed = (value) => {
+    const speed = Number(value);
+    if (!Number.isFinite(speed) || speed <= 0) return;
+    setSpeedInput(String(speed));
+    onSetSpeed?.(speed);
   };
 
   return (
@@ -67,6 +90,134 @@ export default function GrMasterPanel({
           >
             ↺ Réinitialiser la salle
           </button>
+          {status !== 'finished' && (
+            <button
+              type="button"
+              className="gr-btn gr-btn--finish"
+              onClick={() => onControlRoom('finish')}
+            >
+              ⏹ Terminer la séance
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Configuration appliquée à la salle */}
+      <div className="gr-config-summary">
+        <span className="gr-eyebrow">CONFIGURATION DE LA SALLE</span>
+        <ul>
+          <li><span>Actifs</span><strong>{(room?.assets || []).join(', ') || symbol}</strong></li>
+          <li><span>Capital initial</span><strong>{Number(room?.initialCapital ?? 0).toLocaleString('fr-FR')} {currency}</strong></li>
+          <li><span>Levier</span><strong>x{room?.leverage ?? 1}</strong></li>
+          <li><span>Commission</span><strong>{room?.commissionPercent ?? 0} %</strong></li>
+          <li><span>Spread</span><strong>x{room?.spreadMultiplier ?? 1}</strong></li>
+          <li><span>Vente à découvert</span><strong>{room?.allowShortSelling ? 'Autorisée' : 'Interdite'}</strong></li>
+          <li>
+            <span>Exposition max.</span>
+            <strong>{room?.maxExposure ? `${Number(room.maxExposure).toLocaleString('fr-FR')} ${currency}` : 'Illimitée'}</strong>
+          </li>
+          <li>
+            <span>Risque max. / position</span>
+            <strong>{room?.riskLimitPercent ? `${room.riskLimitPercent} %` : 'Aucune limite'}</strong>
+          </li>
+        </ul>
+      </div>
+
+      {/* Contrôle du temps : vitesse de relecture et curseur de séance */}
+      <div className="gr-time-controls">
+        <div className="gr-time-controls__col">
+          <span className="gr-eyebrow">VITESSE DE RELECTURE</span>
+          <div className="gr-speed-presets">
+            {SPEED_PRESETS.map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                className={`gr-btn-pill ${Number(room?.playbackSpeed) === preset ? 'is-active' : ''}`}
+                onClick={() => applySpeed(preset)}
+                disabled={room?.sourceMode === 'live'}
+              >
+                x{preset}
+              </button>
+            ))}
+          </div>
+          <div className="gr-speed-custom">
+            <label htmlFor="grSpeed">Vitesse personnalisée</label>
+            <input
+              id="grSpeed"
+              type="number"
+              min="0.1"
+              max="1000"
+              step="0.1"
+              className="gr-input gr-input--sm"
+              value={speedInput}
+              disabled={room?.sourceMode === 'live'}
+              onChange={(e) => setSpeedInput(e.target.value)}
+            />
+            <button
+              type="button"
+              className="gr-btn gr-btn--sm"
+              disabled={room?.sourceMode === 'live'}
+              onClick={() => applySpeed(speedInput)}
+            >
+              Appliquer
+            </button>
+          </div>
+          <small className="gr-master-note">
+            {room?.sourceMode === 'live'
+              ? 'En marché live la vitesse est fixée à 1x : les cotations réelles défilent en temps réel.'
+              : `Actuellement x${room?.playbackSpeed ?? 1} — ${(room?.durationMinutes ?? 30)} min réelles pour ${Math.round(totalSeconds / 60)} min de marché.`}
+          </small>
+        </div>
+
+        <div className="gr-time-controls__col">
+          <span className="gr-eyebrow">CURSEUR DE SÉANCE (TIMELINE)</span>
+          <input
+            id="grTimeline"
+            type="range"
+            min="0"
+            max={totalSeconds}
+            step="1"
+            className="gr-timeline"
+            value={Math.min(seekSeconds, totalSeconds)}
+            onChange={(e) => {
+              setSeekSeconds(Number(e.target.value));
+              setSeekDirty(true);
+            }}
+          />
+          <div className="gr-timeline__labels">
+            <span>Min 0</span>
+            <strong>
+              Min {(seekSeconds / 60).toFixed(1)} / {room?.totalMinutes ?? Math.round(totalSeconds / 60)}
+            </strong>
+            <span>Min {room?.totalMinutes ?? Math.round(totalSeconds / 60)}</span>
+          </div>
+          <div className="gr-timeline__actions">
+            <button
+              type="button"
+              className="gr-btn gr-btn--sm"
+              onClick={() => {
+                setSeekSeconds(0);
+                setSeekDirty(false);
+                onSeek?.(0);
+              }}
+            >
+              ⏮ Revenir au début
+            </button>
+            <button
+              type="button"
+              className="gr-btn gr-btn--sm gr-btn--primary"
+              onClick={() => {
+                setSeekDirty(false);
+                onSeek?.(seekSeconds);
+              }}
+            >
+              Aller à Min {(seekSeconds / 60).toFixed(1)}
+            </button>
+          </div>
+          <small className="gr-master-note">
+            Le curseur déplace la séance pour tous les participants : prix, bougies et chronomètre
+            sont recalculés côté serveur à partir de la seconde choisie.
+          </small>
         </div>
       </div>
 
@@ -314,15 +465,15 @@ export default function GrMasterPanel({
                         <strong>{item.nickname}</strong>
                         {isSelected && <span className="gr-selected-tag">👁️ Actif</span>}
                       </td>
-                      <td><strong>{item.totalValue.toLocaleString('fr-FR')} $US</strong></td>
+                      <td><strong>{item.totalValue.toLocaleString('fr-FR')} {currency}</strong></td>
                       <td className={item.returnPercent >= 0 ? 'is-up' : 'is-down'}>
                         {item.returnPercent >= 0 ? '+' : ''}{item.returnPercent.toFixed(2)} %
                       </td>
                       <td className={item.unrealizedPnl >= 0 ? 'is-up' : 'is-down'}>
-                        {item.unrealizedPnl >= 0 ? '+' : ''}{item.unrealizedPnl.toFixed(2)} $
+                        {item.unrealizedPnl >= 0 ? '+' : ''}{item.unrealizedPnl.toFixed(2)} {currency}
                       </td>
                       <td className={item.realizedPnl >= 0 ? 'is-up' : 'is-down'}>
-                        {item.realizedPnl >= 0 ? '+' : ''}{item.realizedPnl.toFixed(2)} $
+                        {item.realizedPnl >= 0 ? '+' : ''}{item.realizedPnl.toFixed(2)} {currency}
                       </td>
                       <td>{item.positionsCount}</td>
                       <td>{item.tradesCount}</td>

@@ -4,6 +4,7 @@ import HomePage from '../pages/Home/HomePage.jsx';
 import LoadingScreen from '../components/LoadingScreen/LoadingScreen.jsx';
 import RouteLoader from '../components/RouteLoader/RouteLoader.jsx';
 import ProtectedRoute from './ProtectedRoute.jsx';
+import { TRADING_ROLES } from '../data/roles.js';
 
 const SignInPage = lazy(() => import('../pages/SignIn/SignInPage.jsx'));
 const SignUpPage = lazy(() => import('../pages/SignUp/SignUpPage.jsx'));
@@ -21,8 +22,8 @@ const PAGES = [
   { path: '/inscription', Page: SignUpPage },
   { path: '/profil', Page: ProfilePage, protect: true },
   { path: '/admin/utilisateurs', Page: AdminUsersPage, protect: true, roles: ['admin'] },
-  { path: '/marche', Page: PortefeuillePage },
-  { path: '/portefeuille', Page: PortefeuillePage },
+  { path: '/marche', Page: PortefeuillePage, protect: true, roles: TRADING_ROLES },
+  { path: '/portefeuille', Page: PortefeuillePage, protect: true, roles: TRADING_ROLES },
   { path: '/game-room', Page: GameRoomPage },
 ];
 

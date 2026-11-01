@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { formatPrice } from '../../data/roomAssets.js';
 
 const WIDTH = 900;
 const HEIGHT = 280;
@@ -6,10 +7,14 @@ const HEIGHT = 280;
 export default function GrChart({
   series = [],
   averageBuyPrice = null,
-  currentPrice = 2700,
+  currentPrice = 0,
   events = [],
+  symbol = 'XAU/USD',
+  currency = '$US',
+  totalSeconds = 1800,
 }) {
   const [hoverIndex, setHoverIndex] = useState(null);
+  const totalMinutes = Math.max(1, Math.round((totalSeconds || 1800) / 60));
 
   const { points, xs, ys, path, area, minPrice, maxPrice, isUp } = useMemo(() => {
     if (!series || series.length < 2) {
@@ -26,7 +31,7 @@ export default function GrChart({
     const high = max + pad;
 
     const t0 = series[0].t;
-    const tEnd = Math.max(series[series.length - 1].t, 1800); // 30 min (1800s) pour garder l'échelle
+    const tEnd = Math.max(series[series.length - 1].t, totalSeconds || 1800);
     const span = tEnd - t0 || 1;
 
     const xsArr = series.map((p) => ((p.t - t0) / span) * WIDTH);
@@ -47,7 +52,7 @@ export default function GrChart({
       maxPrice: high,
       isUp: up,
     };
-  }, [series, averageBuyPrice]);
+  }, [series, averageBuyPrice, totalSeconds]);
 
   const activeIndex = hoverIndex !== null ? hoverIndex : points.length - 1;
   const activePoint = points[activeIndex];
@@ -76,7 +81,7 @@ export default function GrChart({
     <div className="gr-chart-card">
       <div className="gr-chart-card__head">
         <div className="gr-chart-card__title-group">
-          <span className="gr-eyebrow">GRAPHIQUE DU SCÉNARIO · XAU/USD</span>
+          <span className="gr-eyebrow">GRAPHIQUE DE SÉANCE · {symbol}</span>
           <h3>Cotation simulée de séance</h3>
         </div>
         <div className="gr-chart-card__legend">
@@ -85,7 +90,7 @@ export default function GrChart({
           </span>
           {averageBuyPrice && (
             <span className="gr-legend-item">
-              <i className="gr-legend-color gr-legend-color--avg" /> Achat moyen ({averageBuyPrice.toFixed(2)} $)
+              <i className="gr-legend-color gr-legend-color--avg" /> Achat moyen ({formatPrice(averageBuyPrice, symbol)} {currency})
             </span>
           )}
         </div>
@@ -104,9 +109,9 @@ export default function GrChart({
             </linearGradient>
           </defs>
 
-          {/* Lignes de repère des minutes clés (10, 20) */}
-          <line x1={WIDTH * (10 / 30)} y1="0" x2={WIDTH * (10 / 30)} y2={HEIGHT} className="gr-chart-grid" strokeDasharray="3 3" />
-          <line x1={WIDTH * (20 / 30)} y1="0" x2={WIDTH * (20 / 30)} y2={HEIGHT} className="gr-chart-grid" strokeDasharray="3 3" />
+          {/* Lignes de repère aux tiers de la séance */}
+          <line x1={WIDTH / 3} y1="0" x2={WIDTH / 3} y2={HEIGHT} className="gr-chart-grid" strokeDasharray="3 3" />
+          <line x1={(WIDTH * 2) / 3} y1="0" x2={(WIDTH * 2) / 3} y2={HEIGHT} className="gr-chart-grid" strokeDasharray="3 3" />
 
           {/* Tracé de la courbe et zone sous la courbe */}
           {area && <path d={area} fill="url(#grChartGrad)" />}
@@ -156,19 +161,22 @@ export default function GrChart({
                 left: `${Math.min(82, Math.max(10, (xs[activeIndex] / WIDTH) * 100))}%`,
               }}
             >
-              <strong>{activePoint.price.toFixed(2)} $US</strong>
-              <span>Minute {(activePoint.t / 60).toFixed(1)} / 30</span>
+              <strong>{formatPrice(activePoint.price, symbol)} {currency}</strong>
+              <span>Minute {(activePoint.t / 60).toFixed(1)} / {totalMinutes}</span>
             </div>
           </>
         )}
       </div>
 
       <div className="gr-chart-timeline">
-        <span>Min 0 (Départ 2 700 $)</span>
-        <span>Min 11 (News)</span>
-        <span>Min 22 (Flash Crash 2 620 $)</span>
-        <span>Min 25 (Rebond)</span>
-        <span>Min 30 (Clôture)</span>
+        <span>Min 0 · Départ {series[0] ? formatPrice(series[0].price, symbol) : '—'} {currency}</span>
+        {[0.25, 0.5, 0.75].map((ratio) => (
+          <span key={ratio}>Min {Math.round(totalMinutes * ratio)}</span>
+        ))}
+        <span>
+          Min {totalMinutes} · Clôture{' '}
+          {currentPrice ? `${formatPrice(currentPrice, symbol)} ${currency}` : '—'}
+        </span>
       </div>
     </div>
   );

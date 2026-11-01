@@ -1,12 +1,13 @@
 import { Body, Controller, Get, Inject, Patch, Query } from '@nestjs/common';
 import { Auth } from '../../users/auth.decorator.js';
+import { TRADING_ROLES } from '../../users/user-role.enum.js';
 import { CurrentProfile } from '../../users/current-profile.decorator.js';
 import type { Profile } from '../../users/profile.entity.js';
 import { PositionsQueryDto } from './dto/positions-query.dto.js';
 import { PositionsService } from './positions.service.js';
 import { UpdateProtectionDto } from './dto/update-protection.dto.js';
 
-@Auth()
+@Auth(...TRADING_ROLES)
 @Controller('portfolio')
 export class PositionsController {
   constructor(@Inject(PositionsService) private readonly positions: PositionsService) {}

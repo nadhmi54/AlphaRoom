@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { GameRoomService } from './game-room.service.js';
 import { SimulationEngineService } from './simulation-engine.service.js';
-import { PANIC_TUESDAY_SCENARIO } from '../scenario/panic-tuesday.scenario.js';
 
 @Injectable()
 export class GameRoomAiService {
@@ -18,6 +17,7 @@ export class GameRoomAiService {
     const minute = details.room.currentMinute;
     const price = details.market.price;
     const spread = details.market.spread;
+    const symbol = details.market.symbol;
 
     let sentiment = 'Neutre';
     let summary = '';
@@ -25,7 +25,7 @@ export class GameRoomAiService {
 
     if (minute < 10) {
       sentiment = 'Stable / Consolidation';
-      summary = `Le cours de XAU/USD oscille calmement autour de ${price} $US avec un spread étroit de ${spread} $US. Phase idéale pour calibrer la taille de ses positions sans subir de slippage excessif.`;
+      summary = `Le cours de ${symbol} oscille calmement autour de ${price} avec un spread étroit de ${spread}. Phase idéale pour calibrer la taille de ses positions sans subir de slippage excessif.`;
       recommendations = [
         'Établir un plan de trading avant l’arrivée des annonces macroéconomiques.',
         'Fixer systématiquement un Stop-Loss adapté à votre capital (max 1-2% de risque par trade).',
@@ -78,25 +78,27 @@ export class GameRoomAiService {
     const currentPrice = details.market.price;
 
     const lowerQ = (question || '').toLowerCase();
+    const symbol = details.market.symbol;
+    const initialCash = student.portfolio.initialCash;
     let answer = '';
 
     if (lowerQ.includes('perte') || lowerQ.includes('pourquoi') || lowerQ.includes('pnl')) {
       if (returnPercent < 0) {
-        answer = `Votre portefeuille est en perte de ${Math.abs(returnPercent)}% (valeur actuelle : ${totalValue} $US contre 100 000 $US initiaux). Cela s'explique par votre exposition sur XAU/USD : vos achats ont été réalisés à un prix moyen supérieur au cours actuel de ${currentPrice} $US. Si vous n'avez pas posé de Stop-Loss lors de la baisse, la perte latente s'est creusée.`;
+        answer = `Votre portefeuille est en perte de ${Math.abs(returnPercent)}% (valeur actuelle : ${totalValue} contre ${initialCash} initiaux). Cela s'explique par votre exposition sur ${symbol} : vos achats ont été réalisés à un prix moyen supérieur au cours actuel de ${currentPrice}. Si vous n'avez pas posé de Stop-Loss lors de la baisse, la perte latente s'est creusée.`;
       } else {
-        answer = `Votre portefeuille est actuellement positif avec un rendement de +${returnPercent}%. Vos prises de positions sont en phase avec la trajectoire actuelle du scénario.`;
+        answer = `Votre portefeuille est actuellement positif avec un rendement de +${returnPercent}%. Vos prises de positions sont en phase avec la trajectoire actuelle du marché de la salle.`;
       }
     } else if (lowerQ.includes('exposition') || lowerQ.includes('position') || lowerQ.includes('quantité')) {
-      const goldQty = positions.reduce((acc, p) => acc + p.quantity, 0);
-      const notional = Math.round(goldQty * currentPrice * 100) / 100;
-      const exposurePercent = Math.round((notional / totalValue) * 100);
-      answer = `Votre exposition actuelle sur XAU/USD est de ${goldQty} onces, représentant une valeur de marché de ${notional} $US, soit ${exposurePercent}% de la valeur totale de votre portefeuille. Un niveau supérieur à 50% vous expose fortement aux mouvements brutaux du scénario.`;
+      const heldQty = positions.reduce((acc, p) => acc + p.quantity, 0);
+      const notional = Math.round(heldQty * currentPrice * 100) / 100;
+      const exposurePercent = totalValue > 0 ? Math.round((notional / totalValue) * 100) : 0;
+      answer = `Votre exposition actuelle sur ${symbol} est de ${heldQty} unités, représentant une valeur de marché de ${notional}, soit ${exposurePercent}% de la valeur totale de votre portefeuille. Un niveau supérieur à 50% vous expose fortement aux mouvements brutaux du scénario.`;
     } else if (lowerQ.includes('stop') || lowerQ.includes('stop-loss') || lowerQ.includes('protection')) {
-      answer = `Le Stop-Loss est un ordre automatique qui vend votre position dès que le cours franchit un seuil bas prédéfini (ex: 2 680 $US). Il vous garantit de couper vos pertes avant d'atteindre un niveau critique, protégeant ainsi vos 100 000 $US de capital virtuel même en cas de crash violent.`;
+      answer = `Le Stop-Loss est un ordre automatique qui clôture votre position dès que le cours franchit un seuil prédéfini. Il vous garantit de couper vos pertes avant d'atteindre un niveau critique, protégeant ainsi vos ${initialCash} de capital virtuel même en cas de crash violent.`;
     } else if (lowerQ.includes('spread') || lowerQ.includes('carnet')) {
-      answer = `Le spread est l’écart entre le meilleur prix d'achat (Bid) et le meilleur prix de vente (Ask), actuellement à ${details.market.spread} $US. Quand le spread augmente (comme lors de la minute 22), acheter au marché coûte plus cher et vendre rapporte moins.`;
+      answer = `Le spread est l’écart entre le meilleur prix d'achat (Bid) et le meilleur prix de vente (Ask), actuellement à ${details.market.spread} sur ${symbol}. Quand le spread augmente, acheter au marché coûte plus cher et vendre rapporte moins.`;
     } else {
-      answer = `Actuellement à la minute ${details.room.currentMinute} sur ${PANIC_TUESDAY_SCENARIO.name}, votre portefeuille vaut ${totalValue} $US (${returnPercent}% de rendement). Vous disposez de ${cash} $US de cash liquide. Pour bien performer, veillez à ne pas sur-dimensionner vos positions et utilisez toujours des ordres limites ou des Stop-Loss.`;
+      answer = `Actuellement à la minute ${details.room.currentMinute} de « ${details.room.name} », votre portefeuille vaut ${totalValue} (${returnPercent}% de rendement). Vous disposez de ${cash} de cash liquide. Pour bien performer, veillez à ne pas sur-dimensionner vos positions et utilisez toujours des ordres limites ou des Stop-Loss.`;
     }
 
     return {

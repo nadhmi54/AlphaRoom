@@ -1,10 +1,14 @@
 // Modules fonctionnels d'AlphaRoom affichés sur la home page.
 // M1 : Salle de marché classique (inchangée).
 // M2 : Game Room — Salle de simulation pédagogique multi-participants.
+// `roles` absent = module ouvert à tous les comptes connectés.
+import { TRADING_ROLES } from './roles.js';
+
 export const MODULES = [
   {
     id: 'portefeuille',
     number: 'M1',
+    roles: TRADING_ROLES,
     title: 'Marché, Trading & Portefeuille',
     role: 'Trader',
     question: 'Comment trader et gérer son portefeuille ?',

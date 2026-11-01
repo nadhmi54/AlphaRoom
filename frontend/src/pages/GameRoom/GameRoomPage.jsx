@@ -9,8 +9,11 @@ import GrOrderBook from './GrOrderBook.jsx';
 import GrTradePanel from './GrTradePanel.jsx';
 import GrPositions from './GrPositions.jsx';
 import GrMasterPanel from './GrMasterPanel.jsx';
+import GrCreateRoomModal from './GrCreateRoomModal.jsx';
+import { assetDecimals, assetUnitShort } from '../../data/roomAssets.js';
 import {
   getDemoRoom,
+  getMyRooms,
   getGameRoomDetails,
   getGameRoomPortfolio,
   placeSimOrder,
@@ -19,16 +22,28 @@ import {
   triggerGameMasterAction,
   getGameRoomDashboard,
   joinGameRoom,
+  setRoomSpeed,
+  seekRoom,
 } from '../../services/gameRoomService.js';
 import './GameRoomPage.css';
 
 const SYNC_INTERVAL_MS = 2500;
+
+const SOURCE_LABELS = {
+  scenario: 'Scénario pédagogique',
+  synthetic: 'Marché synthétique',
+  historical: 'Données historiques',
+  csv: 'Import CSV',
+  live: 'Marché en direct',
+};
 
 export default function GameRoomPage() {
   const { profile } = useAuth();
   const [roomData, setRoomData] = useState(null);
   const [portfolioData, setPortfolioData] = useState(null);
   const [dashboardData, setDashboardData] = useState(null);
+  const [myRooms, setMyRooms] = useState([]);
+  const [activeSymbol, setActiveSymbol] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -45,38 +60,72 @@ export default function GameRoomPage() {
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [joinCodeInput, setJoinCodeInput] = useState('');
   const [joinNicknameInput, setJoinNicknameInput] = useState('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const activeRoomIdRef = useRef(null);
   const previousEventsCountRef = useRef(0);
 
+  const isMasterRole = profile?.role === 'game_master' || profile?.role === 'admin';
+
   // Vérification stricte du rôle : Seuls 'game_master' ou 'admin' peuvent voir le panneau enseignant.
   // Un utilisateur étudiant / trader ne verra JAMAIS le panneau enseignant ni le tableau des participants.
-  const isMaster = Boolean(
-    (profile?.role === 'game_master' || profile?.role === 'admin') &&
-    roomData?.room?.isMaster
-  );
+  const isMaster = Boolean(isMasterRole && roomData?.room?.isMaster);
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 4500);
   };
 
-  // Chargement initial (salle démo)
+  // Chargement complet d'une salle donnée (marché, portefeuille, tableau de bord)
+  const loadRoom = useCallback(
+    async (roomId, symbol) => {
+      const details = await getGameRoomDetails(roomId, symbol);
+      activeRoomIdRef.current = roomId;
+      setActiveSymbol(details.room?.activeSymbol ?? null);
+      setRoomData(details);
+
+      const [pf, dash] = await Promise.all([
+        getGameRoomPortfolio(roomId),
+        isMasterRole ? getGameRoomDashboard(roomId) : Promise.resolve(null),
+      ]);
+      setPortfolioData(pf);
+      setDashboardData(dash);
+      return details;
+    },
+    [isMasterRole],
+  );
+
+  const refreshMyRooms = useCallback(async () => {
+    if (!isMasterRole) return [];
+    const mine = await getMyRooms();
+    const rooms = mine.rooms || [];
+    setMyRooms(rooms);
+    return rooms;
+  }, [isMasterRole]);
+
+  // Chargement initial : les salles du Meneur de Jeu, sinon la salle démo
   const initRoom = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
-      const initial = await getDemoRoom();
-      setRoomData(initial);
-      activeRoomIdRef.current = initial.room.id;
 
-      const userIsMaster =
-        (profile?.role === 'game_master' || profile?.role === 'admin') &&
-        Boolean(initial.room?.isMaster);
+      if (isMasterRole) {
+        const rooms = await refreshMyRooms().catch(() => []);
+        const preferred = rooms.find((room) => room.status === 'running') || rooms[0];
+        if (preferred) {
+          await loadRoom(preferred.id);
+          return;
+        }
+      }
+
+      const initial = await getDemoRoom();
+      activeRoomIdRef.current = initial.room.id;
+      setActiveSymbol(initial.room?.activeSymbol ?? initial.market?.symbol ?? null);
+      setRoomData(initial);
 
       const [pf, dash] = await Promise.all([
         getGameRoomPortfolio(initial.room.id),
-        userIsMaster ? getGameRoomDashboard(initial.room.id) : Promise.resolve(null),
+        initial.room?.isMaster && isMasterRole ? getGameRoomDashboard(initial.room.id) : Promise.resolve(null),
       ]);
       setPortfolioData(pf);
       if (dash) setDashboardData(dash);
@@ -85,7 +134,7 @@ export default function GameRoomPage() {
     } finally {
       setLoading(false);
     }
-  }, [profile?.role]);
+  }, [isMasterRole, loadRoom, refreshMyRooms]);
 
   useEffect(() => {
     initRoom();
@@ -96,12 +145,10 @@ export default function GameRoomPage() {
     const roomId = activeRoomIdRef.current;
     if (!roomId) return;
     try {
-      const userIsMaster =
-        (profile?.role === 'game_master' || profile?.role === 'admin') &&
-        Boolean(roomData?.room?.isMaster);
+      const userIsMaster = Boolean(isMasterRole && roomData?.room?.isMaster);
 
       const [updatedDetails, updatedPf] = await Promise.all([
-        getGameRoomDetails(roomId),
+        getGameRoomDetails(roomId, activeSymbol),
         getGameRoomPortfolio(roomId),
       ]);
       setRoomData(updatedDetails);
@@ -122,7 +169,7 @@ export default function GameRoomPage() {
     } catch {
       // Ignorer silencieusement les erreurs de polling
     }
-  }, [profile?.role, roomData?.room?.isMaster]);
+  }, [isMasterRole, roomData?.room?.isMaster, activeSymbol]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -130,6 +177,47 @@ export default function GameRoomPage() {
     }, SYNC_INTERVAL_MS);
     return () => clearInterval(timer);
   }, [syncRoom]);
+
+  // Création d'une salle par le Meneur de Jeu
+  const handleRoomCreated = async (room) => {
+    setShowCreateModal(false);
+    try {
+      await refreshMyRooms().catch(() => {});
+      await loadRoom(room.id);
+      showToast(
+        `Salle « ${room.name} » créée. Code de participation : ${room.joinCode}`,
+        'success',
+      );
+    } catch (err) {
+      setError(err.message || 'Salle créée mais impossible à charger.');
+    }
+  };
+
+  const handleSelectRoom = async (roomId) => {
+    if (!roomId || roomId === activeRoomIdRef.current) return;
+    try {
+      setLoading(true);
+      setSelectedStudentId(null);
+      previousEventsCountRef.current = 0;
+      await loadRoom(roomId);
+    } catch (err) {
+      showToast(err.message || 'Impossible d’ouvrir cette salle.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChangeSymbol = async (symbol) => {
+    setActiveSymbol(symbol);
+    const roomId = activeRoomIdRef.current;
+    if (!roomId) return;
+    try {
+      const details = await getGameRoomDetails(roomId, symbol);
+      setRoomData(details);
+    } catch {
+      // Le polling suivant réessaiera
+    }
+  };
 
   // Passage d'un ordre simulé (Étudiant)
   const handlePlaceOrder = async (orderPayload) => {
@@ -139,7 +227,7 @@ export default function GameRoomPage() {
       const res = await placeSimOrder(roomData.room.id, orderPayload);
       const actionWord = orderPayload.side === 'buy' ? 'Acheté' : 'Vendu';
       showToast(
-        `${actionWord} ${orderPayload.quantity} oz · XAU/USD à ${res.executedPrice || orderPayload.limitPrice} $US`,
+        `${actionWord} ${orderPayload.quantity} ${orderPayload.symbol} à ${res.executedPrice ?? orderPayload.limitPrice}`,
         'success',
       );
       await syncRoom();
@@ -174,12 +262,36 @@ export default function GameRoomPage() {
         start: 'Séance démarrée ! Les prix et le chronomètre défilent.',
         pause: 'Séance mise en pause.',
         resume: 'Séance reprise.',
-        reset: 'Salle réinitialisée au départ (Minute 0, 100 000 $).',
+        reset: 'Salle réinitialisée au départ (Minute 0, capital initial restauré).',
+        finish: 'Séance terminée. Les étudiants voient le bilan final.',
       };
       showToast(labels[action] || 'Action exécutée.', 'success');
       await syncRoom();
     } catch (err) {
       showToast(err.message || 'Erreur d’action', 'error');
+    }
+  };
+
+  // Vitesse de relecture et curseur de séance (Meneur de jeu)
+  const handleSetSpeed = async (speed) => {
+    if (!roomData?.room?.id) return;
+    try {
+      await setRoomSpeed(roomData.room.id, speed);
+      showToast(`Vitesse de relecture réglée à x${speed}.`, 'success');
+      await syncRoom();
+    } catch (err) {
+      showToast(err.message || 'Impossible de modifier la vitesse.', 'error');
+    }
+  };
+
+  const handleSeek = async (seconds) => {
+    if (!roomData?.room?.id) return;
+    try {
+      await seekRoom(roomData.room.id, Math.max(0, Math.round(seconds)));
+      showToast(`Curseur déplacé à ${Math.round(seconds / 60)} min de simulation.`, 'success');
+      await syncRoom();
+    } catch (err) {
+      showToast(err.message || 'Impossible de déplacer le curseur.', 'error');
     }
   };
 
@@ -202,12 +314,12 @@ export default function GameRoomPage() {
     try {
       setLoading(true);
       const res = await joinGameRoom(joinCodeInput.trim(), joinNicknameInput.trim());
-      activeRoomIdRef.current = res.room.id;
       setShowJoinModal(false);
       setJoinCodeInput('');
       setJoinNicknameInput('');
+      previousEventsCountRef.current = 0;
+      await loadRoom(res.room.id);
       showToast(`Connecté à la salle : ${res.room.name}`, 'success');
-      await syncRoom();
     } catch (err) {
       showToast(err.message || 'Salle introuvable avec ce code', 'error');
     } finally {
@@ -215,8 +327,13 @@ export default function GameRoomPage() {
     }
   };
 
-  const currentHeld = portfolioData?.positions?.find((p) => p.symbol === 'XAU/USD')?.quantity || 0;
-  const avgBuy = portfolioData?.positions?.find((p) => p.symbol === 'XAU/USD')?.averagePrice || null;
+  const room = roomData?.room;
+  const market = roomData?.market;
+  const currency = room?.currency === 'EUR' ? '€' : '$US';
+  const symbol = market?.symbol || activeSymbol || room?.assets?.[0] || 'XAU/USD';
+
+  const currentHeld = portfolioData?.positions?.find((p) => p.symbol === symbol)?.quantity || 0;
+  const avgBuy = portfolioData?.positions?.find((p) => p.symbol === symbol)?.averagePrice || null;
 
   // Étudiant actuellement sélectionné par le Meneur de Jeu pour inspection
   const activeStudent =
@@ -276,6 +393,15 @@ export default function GameRoomPage() {
             </span>
           </div>
           <div className="gr-sub-bar__right">
+            {isMasterRole && (
+              <button
+                type="button"
+                className="gr-btn gr-btn--create"
+                onClick={() => setShowCreateModal(true)}
+              >
+                + Créer une salle
+              </button>
+            )}
             <button
               type="button"
               className="gr-btn gr-btn--join"
@@ -286,6 +412,59 @@ export default function GameRoomPage() {
           </div>
         </div>
 
+        {/* SÉLECTEUR DE SALLE · MENEUR DE JEU */}
+        {isMasterRole && (
+          <div className="gr-room-switcher">
+            <div className="gr-room-switcher__head">
+              <span className="gr-eyebrow">MES SALLES DE SIMULATION ({myRooms.length})</span>
+              <span className="gr-room-switcher__tip">
+                La configuration d’une salle ne peut plus être modifiée une fois la séance lancée.
+              </span>
+            </div>
+
+            {myRooms.length === 0 ? (
+              <p className="gr-room-switcher__empty">
+                Aucune salle créée pour l’instant. Utilisez « + Créer une salle » pour configurer
+                la source de marché, la durée, le capital et les règles de risque de votre séance.
+              </p>
+            ) : (
+              <div className="gr-room-cards">
+                {myRooms.map((item) => {
+                  const isActive = item.id === room?.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`gr-room-card ${isActive ? 'is-active' : ''}`}
+                      onClick={() => handleSelectRoom(item.id)}
+                      title={item.description || item.name}
+                    >
+                      <span className={`gr-status gr-status--${item.status}`}>
+                        <i className="gr-status__dot" aria-hidden="true" />
+                        {item.status === 'waiting' ? 'En attente'
+                          : item.status === 'running' ? 'En cours'
+                          : item.status === 'paused' ? 'En pause' : 'Terminée'}
+                      </span>
+                      <strong>{item.name}</strong>
+                      <small>
+                        Code {item.joinCode} · {SOURCE_LABELS[item.sourceMode] || item.sourceMode}
+                      </small>
+                      <small>
+                        {item.assets?.join(', ')} · {item.durationMinutes} min réelles (x{item.playbackSpeed})
+                        · {Number(item.initialCapital).toLocaleString('fr-FR')} {item.currency}
+                      </small>
+                      <small className="gr-room-card__meta">
+                        {item.participantsCount}/{item.maxParticipants} participants
+                        {item.currentPrice ? ` · ${item.currentPrice} ` : ''}
+                      </small>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {roomData && (
           <>
             {/* EN-TÊTE COMMUN DE LA SALLE */}
@@ -293,11 +472,37 @@ export default function GameRoomPage() {
               room={roomData.room}
               market={roomData.market}
               participantsCount={roomData.participantsCount}
+              currency={currency}
+              sourceLabel={SOURCE_LABELS[roomData.room?.sourceMode] || 'Scénario pédagogique'}
               onJoinCodeClick={(code) => {
                 navigator.clipboard?.writeText(code);
                 showToast(`Code ${code} copié dans le presse-papier !`);
               }}
             />
+
+            {/* SÉLECTEUR D'ACTIF (salles multi-actifs) */}
+            {(room?.assets?.length ?? 0) > 1 && (
+              <div className="gr-symbol-tabs" role="tablist" aria-label="Actifs de la salle">
+                {room.assets.map((assetSymbol) => {
+                  const quote = market?.symbols?.find((item) => item.symbol === assetSymbol);
+                  return (
+                    <button
+                      key={assetSymbol}
+                      type="button"
+                      role="tab"
+                      aria-selected={assetSymbol === symbol}
+                      className={`gr-symbol-tab ${assetSymbol === symbol ? 'is-active' : ''}`}
+                      onClick={() => handleChangeSymbol(assetSymbol)}
+                    >
+                      <strong>{assetSymbol}</strong>
+                      {quote?.price != null && (
+                        <span>{Number(quote.price).toFixed(assetDecimals(assetSymbol))} {currency}</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {/* =========================================================================
                 VUE 1 : INTERFACE ÉTUDIANT (Trader / Client normal)
@@ -306,14 +511,17 @@ export default function GameRoomPage() {
                ========================================================================= */}
             {!isMaster && (
               <div className="gr-student-view">
-                {/* Son Portefeuille Virtuel Indépendant (100k$) */}
-                <GrPortfolio portfolio={portfolioData?.portfolio} />
+                {/* Son Portefeuille Virtuel Indépendant */}
+                <GrPortfolio portfolio={portfolioData?.portfolio} currency={currency} />
 
                 {/* Scène de Marché : Graphique + Carnet + Trading */}
                 <div className="gr-main-grid">
                   <div className="gr-main-grid__chart-col">
                     <GrChart
                       series={roomData.market?.series}
+                      symbol={symbol}
+                      currency={currency}
+                      totalSeconds={room?.totalSimSeconds}
                       averageBuyPrice={avgBuy}
                       currentPrice={roomData.market?.price}
                       events={roomData.recentEvents}
@@ -323,6 +531,7 @@ export default function GameRoomPage() {
                     <GrPositions
                       positions={portfolioData?.positions}
                       trades={portfolioData?.trades}
+                      currency={currency}
                       onClosePosition={handleClosePosition}
                       isClosing={isClosing}
                     />
@@ -331,11 +540,22 @@ export default function GameRoomPage() {
                   <div className="gr-main-grid__side-col">
                     {/* Zone de Trading Étudiant */}
                     <GrTradePanel
+                      symbol={symbol}
+                      unit={assetUnitShort(symbol)}
+                      currency={currency}
+                      decimals={assetDecimals(symbol)}
+                      assets={room?.assets}
+                      leverage={room?.leverage}
+                      commissionPercent={room?.commissionPercent}
+                      allowShortSelling={room?.allowShortSelling}
+                      riskLimitPercent={room?.riskLimitPercent}
+                      maxExposure={room?.maxExposure}
                       marketPrice={roomData.market?.price}
                       cash={portfolioData?.portfolio?.cash}
                       heldQuantity={currentHeld}
                       selectedPrice={selectedBookPrice}
                       selectedSide={selectedBookSide}
+                      onSelectSymbol={handleChangeSymbol}
                       onSubmitOrder={handlePlaceOrder}
                       isSubmitting={isSubmitting}
                     />
@@ -343,6 +563,9 @@ export default function GameRoomPage() {
                     {/* Carnet d'ordres simulé */}
                     <GrOrderBook
                       book={roomData.book}
+                      symbol={symbol}
+                      currency={currency}
+                      decimals={assetDecimals(symbol)}
                       onSelectPrice={(price, s) => {
                         setSelectedBookPrice(price);
                         setSelectedBookSide(s);
@@ -365,8 +588,12 @@ export default function GameRoomPage() {
                 <GrMasterPanel
                   room={roomData.room}
                   dashboard={dashboardData}
+                  currency={currency}
+                  symbol={symbol}
                   onControlRoom={handleControlRoom}
                   onTriggerAction={handleTriggerAction}
+                  onSetSpeed={handleSetSpeed}
+                  onSeek={handleSeek}
                   selectedStudentId={activeStudent?.userId}
                   onSelectStudent={(id) => setSelectedStudentId(id)}
                 />
@@ -376,6 +603,9 @@ export default function GameRoomPage() {
                   <div className="gr-main-grid__chart-col">
                     <GrChart
                       series={roomData.market?.series}
+                      symbol={symbol}
+                      currency={currency}
+                      totalSeconds={room?.totalSimSeconds}
                       currentPrice={roomData.market?.price}
                       events={roomData.recentEvents}
                     />
@@ -387,7 +617,7 @@ export default function GameRoomPage() {
                           <span className="gr-eyebrow">SUPERVISION INDIVIDUELLE · ÉTUDIANT TRADER</span>
                           <h4>
                             {activeStudent
-                              ? `Positions & Ordres de : ${activeStudent.nickname} (${activeStudent.totalValue.toLocaleString('fr-FR')} $US)`
+                              ? `Positions & Ordres de : ${activeStudent.nickname} (${activeStudent.totalValue.toLocaleString('fr-FR')} ${currency})`
                               : 'En attente de participants étudiants...'}
                           </h4>
                         </div>
@@ -425,6 +655,9 @@ export default function GameRoomPage() {
                   <div className="gr-main-grid__side-col">
                     <GrOrderBook
                       book={roomData.book}
+                      symbol={symbol}
+                      currency={currency}
+                      decimals={assetDecimals(symbol)}
                       onSelectPrice={() => {}}
                     />
                   </div>
@@ -432,6 +665,14 @@ export default function GameRoomPage() {
               </div>
             )}
           </>
+        )}
+
+        {/* Modal de création et de configuration d'une salle (Meneur de Jeu) */}
+        {showCreateModal && (
+          <GrCreateRoomModal
+            onClose={() => setShowCreateModal(false)}
+            onCreated={handleRoomCreated}
+          />
         )}
 
         {/* Modal pour rejoindre une salle */}

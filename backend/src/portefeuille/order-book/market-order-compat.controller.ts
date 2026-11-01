@@ -1,5 +1,6 @@
 import { Body, Controller, Post } from '@nestjs/common';
 import { Auth } from '../../users/auth.decorator.js';
+import { TRADING_ROLES } from '../../users/user-role.enum.js';
 import { CurrentProfile } from '../../users/current-profile.decorator.js';
 import type { Profile } from '../../users/profile.entity.js';
 import { PlaceOrderDto } from '../trading/dto/place-order.dto.js';
@@ -11,7 +12,7 @@ import { OrderBookService } from './order-book.service.js';
  * pas le carnet : elle délègue au même moteur d'appariement, avec la réponse
  * au format précédent (prix moyen, montant total).
  */
-@Auth()
+@Auth(...TRADING_ROLES)
 @Controller('trading/orders')
 export class MarketOrderCompatController {
   constructor(private readonly book: OrderBookService) {}

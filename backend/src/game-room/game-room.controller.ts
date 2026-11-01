@@ -1,23 +1,30 @@
 import {
   Body,
   Controller,
-  ForbiddenException,
   Get,
   Param,
+  Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { Auth } from '../users/auth.decorator.js';
 import { CurrentProfile } from '../users/current-profile.decorator.js';
+import { MASTER_ROLES } from '../users/user-role.enum.js';
 import type { Profile } from '../users/profile.entity.js';
 import { GameRoomService } from './services/game-room.service.js';
 import { SimulationEngineService } from './services/simulation-engine.service.js';
 import { GameRoomAiService } from './services/game-room-ai.service.js';
 import {
+  ClosePositionDto,
   CreateGameRoomDto,
+  CsvPreviewDto,
   GameMasterActionDto,
   JoinGameRoomDto,
   PlaceSimOrderDto,
   RoomControlDto,
+  RoomSeekDto,
+  RoomSpeedDto,
+  UpdateGameRoomConfigDto,
 } from './dto/game-room.dto.js';
 
 @Controller('game-room')
@@ -41,11 +48,26 @@ export class GameRoomController {
     return this.roomService.getRoomDetails(demo.id, profile.id, profile.role);
   }
 
-  /** Créer une nouvelle salle de simulation (Enseignant). */
+  /** Salles créées par le Meneur de Jeu connecté. */
+  @Get('mine')
+  @Auth(...MASTER_ROLES)
+  async getMyRooms(@CurrentProfile() profile: Profile) {
+    return { rooms: await this.roomService.getMasterRooms(profile.id) };
+  }
+
+  /** Validation et aperçu d'un fichier CSV de bougies, avant création de la salle. */
+  @Post('preview-csv')
+  @Auth(...MASTER_ROLES)
+  previewCsv(@Body() body: CsvPreviewDto) {
+    return this.roomService.previewCsv(body.content);
+  }
+
+  /** Créer une salle de simulation configurée (Enseignant / Game Master). */
   @Post('create')
-  @Auth()
+  @Auth(...MASTER_ROLES)
   async createRoom(@CurrentProfile() profile: Profile, @Body() body: CreateGameRoomDto) {
-    return this.roomService.createRoom(profile.id, body.name, body.scenarioId);
+    const room = await this.roomService.createRoom(profile.id, body);
+    return this.roomService.publicRoomView(room);
   }
 
   /** Rejoindre une salle avec son joinCode (ex: "PANIC1"). */
@@ -62,8 +84,23 @@ export class GameRoomController {
   /** Obtenir les informations et l'état en direct d'une salle (cours, temps, carnet, participants). */
   @Get(':roomId')
   @Auth()
-  async getRoomDetails(@CurrentProfile() profile: Profile, @Param('roomId') roomId: string) {
-    return this.roomService.getRoomDetails(roomId, profile.id, profile.role);
+  async getRoomDetails(
+    @CurrentProfile() profile: Profile,
+    @Param('roomId') roomId: string,
+    @Query('symbol') symbol?: string,
+  ) {
+    return this.roomService.getRoomDetails(roomId, profile.id, profile.role, symbol);
+  }
+
+  /** Bougies OHLC de la salle sur le timeframe demandé. */
+  @Get(':roomId/candles')
+  @Auth()
+  async getCandles(
+    @Param('roomId') roomId: string,
+    @Query('symbol') symbol?: string,
+    @Query('timeframe') timeframe?: string,
+  ) {
+    return this.roomService.getRoomCandles(roomId, symbol, timeframe);
   }
 
   /** Obtenir le portefeuille virtuel de simulation de l'étudiant. */
@@ -87,7 +124,7 @@ export class GameRoomController {
     return this.simEngine.placeSimulationOrder({
       room,
       userId: profile.id,
-      symbol: body.symbol || 'XAU/USD',
+      symbol: body.symbol,
       side: body.side,
       type: body.type,
       quantity: body.quantity,
@@ -103,38 +140,66 @@ export class GameRoomController {
   async closePosition(
     @CurrentProfile() profile: Profile,
     @Param('roomId') roomId: string,
-    @Body() body: { symbol: string },
+    @Body() body: ClosePositionDto,
   ) {
     const room = await this.roomService.rooms.findOne({ where: { id: roomId } });
     if (!room) throw new Error('Salle introuvable');
-    return this.simEngine.closePosition(room, profile.id, body.symbol || 'XAU/USD');
+    return this.simEngine.closePosition(room, profile.id, body.symbol ?? '');
   }
 
-  /** Contrôle de la séance : Play, Pause, Resume, Reset (Game Master). */
+  /** Modifier la configuration d'une salle non lancée (Game Master). */
+  @Patch(':roomId/config')
+  @Auth(...MASTER_ROLES)
+  async updateConfig(
+    @CurrentProfile() profile: Profile,
+    @Param('roomId') roomId: string,
+    @Body() body: UpdateGameRoomConfigDto,
+  ) {
+    const room = await this.roomService.updateRoomConfig(roomId, profile.id, body);
+    return this.roomService.publicRoomView(room);
+  }
+
+  /** Contrôle de la séance : Play, Pause, Resume, Reset, Fin (Game Master). */
   @Post(':roomId/control')
-  @Auth()
+  @Auth(...MASTER_ROLES)
   async controlRoom(
     @CurrentProfile() profile: Profile,
     @Param('roomId') roomId: string,
     @Body() body: RoomControlDto,
   ) {
-    if (profile.role !== 'game_master' && profile.role !== 'admin') {
-      throw new ForbiddenException('Réservé au Meneur de Jeu');
-    }
     return this.roomService.controlRoom(roomId, profile.id, body.action);
   }
 
-  /** Actions Enseignant / Game Master : Chocs de prix, news, spread, liquidité, rollback. */
+  /** Vitesse de relecture de la séance (Game Master). */
+  @Post(':roomId/speed')
+  @Auth(...MASTER_ROLES)
+  async setSpeed(
+    @CurrentProfile() profile: Profile,
+    @Param('roomId') roomId: string,
+    @Body() body: RoomSpeedDto,
+  ) {
+    return this.roomService.setSpeed(roomId, profile.id, body.speed);
+  }
+
+  /** Curseur de séance : saut à une seconde de simulation (Game Master). */
+  @Post(':roomId/seek')
+  @Auth(...MASTER_ROLES)
+  async seek(
+    @CurrentProfile() profile: Profile,
+    @Param('roomId') roomId: string,
+    @Body() body: RoomSeekDto,
+  ) {
+    return this.roomService.seek(roomId, profile.id, body.seconds);
+  }
+
+  /** Actions Enseignant / Game Master : chocs de prix, news, spread, liquidité, rollback. */
   @Post(':roomId/action')
-  @Auth()
+  @Auth(...MASTER_ROLES)
   async gameMasterAction(
     @CurrentProfile() profile: Profile,
     @Param('roomId') roomId: string,
     @Body() body: GameMasterActionDto,
   ) {
-    if (profile.role !== 'game_master' && profile.role !== 'admin') {
-      throw new ForbiddenException('Réservé au Meneur de Jeu');
-    }
     const room = await this.roomService.rooms.findOne({ where: { id: roomId } });
     if (!room) throw new Error('Salle introuvable');
     return this.simEngine.applyGameMasterAction(room, body);
@@ -142,11 +207,8 @@ export class GameRoomController {
 
   /** Tableau de bord de l'enseignant avec classement de tous les participants. */
   @Get(':roomId/dashboard')
-  @Auth()
+  @Auth(...MASTER_ROLES)
   async getDashboard(@CurrentProfile() profile: Profile, @Param('roomId') roomId: string) {
-    if (profile.role !== 'game_master' && profile.role !== 'admin') {
-      return { room: null, market: null, leaderboard: [], isMaster: false };
-    }
     return this.roomService.getMasterDashboard(roomId, profile.id, profile.role);
   }
 

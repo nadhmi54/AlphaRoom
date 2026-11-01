@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { MODULES } from '../../data/modules.js';
+import { useAuth } from '../../context/useAuth.js';
 import './Features.css';
 
 function ModuleCard({ module }) {
@@ -46,6 +47,13 @@ function ModuleCard({ module }) {
 }
 
 export default function Features() {
+  const { profile } = useAuth();
+  // Un module sans `roles` est public ; sinon la carte ne se montre que si le
+  // rôle y a droit (et tant qu'aucun profil n'est chargé, tout reste visible).
+  const visibleModules = MODULES.filter(
+    (module) => !module.roles || !profile || module.roles.includes(profile.role),
+  );
+
   return (
     <section id="features" className="ar-features">
       <div className="ar-features__inner">
@@ -66,7 +74,7 @@ export default function Features() {
         </header>
 
         <div className="ar-features__grid">
-          {MODULES.map((module) => (
+          {visibleModules.map((module) => (
             <ModuleCard key={module.id} module={module} />
           ))}
         </div>

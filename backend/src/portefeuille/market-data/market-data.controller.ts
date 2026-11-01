@@ -1,9 +1,10 @@
 import { Controller, Get, Inject, Query } from '@nestjs/common';
 import { Auth } from '../../users/auth.decorator.js';
+import { TRADING_ROLES } from '../../users/user-role.enum.js';
 import { HistoryQueryDto } from './dto/history-query.dto.js';
 import { MarketDataService } from './market-data.service.js';
 
-@Auth()
+@Auth(...TRADING_ROLES)
 @Controller('market')
 export class MarketDataController {
   constructor(@Inject(MarketDataService) private readonly market: MarketDataService) {}

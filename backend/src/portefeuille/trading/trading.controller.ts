@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Query } from '@nestjs/common';
 import { Auth } from '../../users/auth.decorator.js';
+import { TRADING_ROLES } from '../../users/user-role.enum.js';
 import { CurrentProfile } from '../../users/current-profile.decorator.js';
 import type { Profile } from '../../users/profile.entity.js';
 import { PortfolioHistoryQueryDto } from './dto/portfolio-history-query.dto.js';
@@ -9,7 +10,7 @@ import { TradingService } from './trading.service.js';
 // `order-book/order-book.controller.ts` (`POST /api/orders`) et
 // `order-book/market-order-compat.controller.ts` pour l'ancienne route
 // `POST /api/trading/orders/market`.
-@Auth()
+@Auth(...TRADING_ROLES)
 @Controller('trading')
 export class TradingController {
   constructor(private readonly trading: TradingService) {}
