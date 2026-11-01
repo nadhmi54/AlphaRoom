@@ -13,6 +13,8 @@ const SignInPage = lazy(() => import('../pages/SignIn/SignInPage.jsx'));
 const SignUpPage = lazy(() => import('../pages/SignUp/SignUpPage.jsx'));
 const ProfilePage = lazy(() => import('../pages/Profile/ProfilePage.jsx'));
 const AdminUsersPage = lazy(() => import('../pages/Admin/AdminUsersPage.jsx'));
+const TeacherAiPage = lazy(() => import('../pages/ai/TeacherAiPage.jsx'));
+const StudentAiPage = lazy(() => import('../pages/ai/StudentAiPage.jsx'));
 
 // Le module Portefeuille = une page = un dossier dans src/pages/Portefeuille/.
 const PortefeuillePage = lazy(() => import('../pages/portefeuille/trading/M1MarchePage.jsx'));
@@ -25,6 +27,9 @@ const PAGES = [
   { path: '/inscription', Page: SignUpPage },
   { path: '/profil', Page: ProfilePage, protect: true },
   { path: '/admin/utilisateurs', Page: AdminUsersPage, protect: true, roles: ['admin'] },
+  // Module IA : espace enseignant (meneur de jeu / admin) et bilans de l'étudiant.
+  { path: '/ia/enseignant', Page: TeacherAiPage, protect: true, roles: ['game_master', 'admin'] },
+  { path: '/ia/mes-bilans', Page: StudentAiPage, protect: true },
   { path: '/marche', Page: PortefeuillePage },
   // Alias sémantique : le module s'appelle désormais « Portefeuille ».
   { path: '/portefeuille', Page: PortefeuillePage },
