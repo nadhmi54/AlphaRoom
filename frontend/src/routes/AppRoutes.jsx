@@ -15,6 +15,7 @@ const StudentAiPage = lazy(() => import('../pages/ai/StudentAiPage.jsx'));
 
 // Module 1 : Marché & Portefeuille (existant et inchangé)
 const PortefeuillePage = lazy(() => import('../pages/portefeuille/trading/M1MarchePage.jsx'));
+const MarketFeaturePage = lazy(() => import('../pages/portefeuille/market/MarketPage.jsx'));
 
 // Module 2 : Game Room — Salle de simulation pédagogique
 const GameRoomPage = lazy(() => import('../pages/GameRoom/GameRoomPage.jsx'));
@@ -29,6 +30,8 @@ const PAGES = [
   { path: '/ia/mes-bilans', Page: StudentAiPage, protect: true },
   { path: '/marche', Page: PortefeuillePage, protect: true, roles: TRADING_ROLES },
   // Alias sémantique : le module s'appelle désormais « Portefeuille ».
+  { path: '/portefeuille', Page: PortefeuillePage },
+  { path: '/marche/cotations', Page: MarketFeaturePage, protect: true },
   { path: '/portefeuille', Page: PortefeuillePage, protect: true, roles: TRADING_ROLES },
   // Module 2 : Game Room
   { path: '/game-room', Page: GameRoomPage },

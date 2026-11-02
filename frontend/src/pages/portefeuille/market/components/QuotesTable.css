@@ -1,0 +1,13 @@
+.quotes-table-wrap { width: 100%; overflow-x: auto; background: rgba(255, 255, 255, 0.02); border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05); }
+.quotes-table { width: 100%; border-collapse: collapse; text-align: left; }
+.quotes-table th { padding: 12px 16px; background: rgba(255, 255, 255, 0.03); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(255, 255, 255, 0.5); font-weight: 600; }
+.quotes-table td { padding: 12px 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); font-size: 0.875rem; }
+.symbol-cell { display: flex; flex-direction: column; }
+.symbol-cell small { color: rgba(255, 255, 255, 0.4); font-size: 0.75rem; }
+.price-cell { font-family: 'JetBrains Mono', monospace; }
+.price-value.is-up { color: #00ff88; }
+.price-value.is-down { color: #ff4444; }
+.percent-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-weight: 600; font-size: 0.75rem; }
+.percent-badge.is-up { background: rgba(0, 255, 136, 0.1); color: #00ff88; }
+.percent-badge.is-down { background: rgba(255, 68, 68, 0.1); color: #ff4444; }
+.table-empty { text-align: center; padding: 32px; color: rgba(255, 255, 255, 0.3); }
