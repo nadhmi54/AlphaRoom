@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import { supabase } from "../../../config/supabaseClient.js";
+import { supabase } from '../../../../config/supabaseClient.js';
 import { marketApi } from "../api/marketApi.js";
 
 export default function useMarketStream() {
