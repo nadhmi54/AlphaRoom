@@ -11,7 +11,7 @@ describe('Features', () => {
         <Features />
       </MemoryRouter>,
     );
-    expect(MODULES).toHaveLength(1);
+    expect(MODULES).toHaveLength(2);
     MODULES.forEach((module) => {
       expect(screen.getByText(module.title)).toBeInTheDocument();
     });

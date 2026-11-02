@@ -236,7 +236,7 @@ export default function M1MarchePage() {
   return (
     <ModuleShell moduleId="portefeuille">
       <section className="ck-page" data-mood={mood} aria-busy={loading}>
-        <TickerTape quotes={market.quotes} onSelect={selectFromTicker} />
+        <TickerTape quotes={market.allQuotes} onSelect={selectFromTicker} />
 
         {error && (
           <div className="m1-message m1-message--error" role="alert">
