@@ -16,6 +16,7 @@ const AdminUsersPage = lazy(() => import('../pages/Admin/AdminUsersPage.jsx'));
 
 // Le module Portefeuille = une page = un dossier dans src/pages/Portefeuille/.
 const PortefeuillePage = lazy(() => import('../pages/portefeuille/trading/M1MarchePage.jsx'));
+const MarketFeaturePage = lazy(() => import('../pages/portefeuille/market/MarketPage.jsx'));
 
 // La route du module Portefeuille (anciennement M1 Marché — les autres
 // modules ont été retirés du prototype). Les chemins correspondent à `path`
@@ -28,6 +29,7 @@ const PAGES = [
   { path: '/marche', Page: PortefeuillePage },
   // Alias sémantique : le module s'appelle désormais « Portefeuille ».
   { path: '/portefeuille', Page: PortefeuillePage },
+  { path: '/marche/cotations', Page: MarketFeaturePage, protect: true },
 ];
 
 // Point d'entrée unique pour toutes les routes de l'application.

@@ -1,0 +1,15 @@
+.tx-history { display: flex; flex-direction: column; gap: 16px; }
+.filters-bar { display: flex; flex-wrap: wrap; gap: 12px; background: rgba(255, 255, 255, 0.02); padding: 16px; border-radius: 8px; }
+.filters-bar select, .filters-bar input { background: #1a1a1a; border: 1px solid rgba(255, 255, 255, 0.1); color: white; padding: 8px 12px; border-radius: 4px; font-size: 0.875rem; }
+.history-table-wrap { background: rgba(255, 255, 255, 0.02); border-radius: 8px; overflow: hidden; }
+.history-table { width: 100%; border-collapse: collapse; }
+.history-table th { padding: 12px 16px; background: rgba(255, 255, 255, 0.03); text-align: left; font-size: 0.75rem; color: rgba(255, 255, 255, 0.5); }
+.history-table td { padding: 12px 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+.side-badge { font-size: 0.75rem; font-weight: 600; }
+.side-badge.buy { color: #00ff88; }
+.side-badge.sell { color: #ff4444; }
+.status-badge.executed { background: rgba(0, 255, 136, 0.1); color: #00ff88; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; }
+.pagination-bar { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; color: rgba(255, 255, 255, 0.5); font-size: 0.875rem; }
+.pagination-btns { display: flex; gap: 8px; }
+.pagination-btns button { background: rgba(255, 255, 255, 0.05); border: none; color: white; padding: 6px 16px; border-radius: 4px; cursor: pointer; }
+.pagination-btns button:disabled { opacity: 0.3; cursor: not-allowed; }

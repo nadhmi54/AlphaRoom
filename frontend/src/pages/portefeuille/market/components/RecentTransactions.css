@@ -1,0 +1,8 @@
+.recent-tx-list { list-style: none; padding: 0; margin: 0; }
+.recent-tx-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+.tx-main { display: flex; align-items: center; gap: 12px; }
+.tx-side { font-size: 0.7rem; font-weight: 800; padding: 2px 6px; border-radius: 3px; }
+.tx-side.buy { background: rgba(0, 255, 136, 0.1); color: #00ff88; }
+.tx-side.sell { background: rgba(255, 68, 68, 0.1); color: #ff4444; }
+.tx-details { display: flex; flex-direction: column; align-items: flex-end; text-align: right; }
+.tx-details small { color: rgba(255, 255, 255, 0.4); }

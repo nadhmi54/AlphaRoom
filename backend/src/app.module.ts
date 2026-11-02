@@ -10,6 +10,7 @@ import { OrderBookModule } from './portefeuille/order-book/order-book.module.js'
 import { PositionsModule } from './portefeuille/positions/positions.module.js';
 import { MarketDataModule } from './portefeuille/market-data/market-data.module.js';
 import { PerformanceModule } from './portefeuille/performance/performance.module.js';
+import { MarketModule } from './portefeuille/market/market.module.js';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { PerformanceModule } from './portefeuille/performance/performance.module
     PositionsModule,
     MarketDataModule,
     PerformanceModule,
+    MarketModule,
     // Domain modules (marché & exécution, portefeuille & risque, IA,
     // stress testing...) plug in here as they're built — see the README's
     // "Modules fonctionnels" table for the 6 modules this maps to.
