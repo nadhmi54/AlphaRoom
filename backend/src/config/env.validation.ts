@@ -19,11 +19,9 @@ class EnvironmentVariables {
 
   // Verifies JWTs issued by Supabase Auth (Project Settings > API > JWT Secret,
   // or printed by `supabase start` for local dev).
-  // Required only for projects that still sign access tokens with HS256.
-  // Asymmetric Supabase signing keys are verified through SUPABASE_URL/JWKS.
-  @IsOptional()
   @IsString()
-  SUPABASE_JWT_SECRET?: string;
+  @IsNotEmpty()
+  SUPABASE_JWT_SECRET!: string;
 
   @IsOptional()
   @IsString()
@@ -43,6 +41,42 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   MARKET_DATA_ENABLED?: string;
+
+  // Module IA : "stub" (par défaut, aucune requête externe) ou "anthropic" ou "openai-compat" (Groq, Gemini, OpenRouter, Ollama…).
+  @IsOptional()
+  @IsString()
+  AI_PROVIDER?: string;
+
+  // Clé du fournisseur : uniquement dans backend/.env, jamais dans git.
+  @IsOptional()
+  @IsString()
+  ANTHROPIC_API_KEY?: string;
+
+  // Clé du fournisseur « openai-compat » (jamais dans git) et adresse de son API.
+  @IsOptional()
+  @IsString()
+  AI_API_KEY?: string;
+
+  @IsOptional()
+  @IsString()
+  AI_BASE_URL?: string;
+
+  // Identifiant du modèle utilisé quand AI_PROVIDER n'est pas "stub".
+  @IsOptional()
+  @IsString()
+  AI_MODEL?: string;
+
+  // Source des séances pour le module IA : "demo" (séance fictive) ou absent
+  // (simulation non branchée).
+  @IsOptional()
+  @IsString()
+  AI_SESSION_SOURCE?: string;
+
+  // Mode démo : identifiant (uuid) d'un compte trader qui prend la place de
+  // l'étudiant fictif « Amine », pour tester l'écran étudiant et le coach.
+  @IsOptional()
+  @IsString()
+  AI_DEMO_STUDENT_ID?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>) {

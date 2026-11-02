@@ -1,0 +1,81 @@
+{
+  "name": "AlphaRoom — bilans IA après une séance",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "alpharoom-session-ended",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "n1-webhook",
+      "name": "Séance terminée",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "alpharoom-session-ended"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.ALPHAROOM_API_URL }}/ai/reports/generate",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ sessionId: $json.body.sessionId, run: $json.body.run }) }}",
+        "options": { "timeout": 120000 }
+      },
+      "id": "n2-generate",
+      "name": "Générer les brouillons",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300],
+      "notesInFlow": true,
+      "notes": "Credential « Header Auth » : Authorization = Bearer <jeton d'un enseignant>. Voir README."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "message",
+              "type": "string",
+              "value": "={{ $json.reports.length }} brouillon(s) de bilan prêt(s) à relire pour la séance {{ $('Séance terminée').item.json.body.sessionId }} (passage {{ $('Séance terminée').item.json.body.run }}). {{ $json.skippedValidated.length }} bilan(s) déjà validé(s) conservé(s)."
+            },
+            {
+              "id": "a2",
+              "name": "lien",
+              "type": "string",
+              "value": "={{ $env.ALPHAROOM_FRONT_URL }}/ia/enseignant"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n3-message",
+      "name": "Préparer le message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {},
+      "id": "n4-notify",
+      "name": "Prévenir l'enseignant (à remplacer par Email / Slack / Teams)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [960, 300]
+    }
+  ],
+  "connections": {
+    "Séance terminée": { "main": [[{ "node": "Générer les brouillons", "type": "main", "index": 0 }]] },
+    "Générer les brouillons": { "main": [[{ "node": "Préparer le message", "type": "main", "index": 0 }]] },
+    "Préparer le message": {
+      "main": [[{ "node": "Prévenir l'enseignant (à remplacer par Email / Slack / Teams)", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false
+}
