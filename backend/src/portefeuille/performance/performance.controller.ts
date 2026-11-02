@@ -1,5 +1,6 @@
 import { Controller, Get, ParseUUIDPipe, Param, Query } from '@nestjs/common';
 import { Auth } from '../../users/auth.decorator.js';
+import { TRADING_ROLES } from '../../users/user-role.enum.js';
 import { CurrentProfile } from '../../users/current-profile.decorator.js';
 import type { Profile } from '../../users/profile.entity.js';
 import { PerformanceHistoryQueryDto } from './dto/performance-history-query.dto.js';
@@ -11,7 +12,7 @@ import { PerformanceService } from './performance.service.js';
  * L'identifiant de l'URL est celui du portefeuille (`portfolio.id`), et non
  * celui du profil : le service vérifie la propriété avant de répondre.
  */
-@Auth()
+@Auth(...TRADING_ROLES)
 @Controller('portfolios')
 export class PerformanceController {
   constructor(private readonly performance: PerformanceService) {}

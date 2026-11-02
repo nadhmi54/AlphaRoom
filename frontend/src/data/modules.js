@@ -1,12 +1,14 @@
-// Le module fonctionnel d'AlphaRoom affiché sur la home page (section
-// "Modules", #features). Le prototype se concentre sur le module
-// Portefeuille (ex M1 Marché) — les autres modules ont été retirés.
-// `path` est la route de la page (déclarée dans src/routes/AppRoutes.jsx)
-// et la carte affiche un lien « Ouvrir le module ».
+// Modules fonctionnels d'AlphaRoom affichés sur la home page.
+// M1 : Salle de marché classique (inchangée).
+// M2 : Game Room — Salle de simulation pédagogique multi-participants.
+// `roles` absent = module ouvert à tous les comptes connectés.
+import { TRADING_ROLES } from './roles.js';
+
 export const MODULES = [
   {
     id: 'portefeuille',
     number: 'M1',
+    roles: TRADING_ROLES,
     title: 'Marché, Trading & Portefeuille',
     role: 'Trader',
     question: 'Comment trader et gérer son portefeuille ?',
@@ -17,5 +19,19 @@ export const MODULES = [
     image: '/images/modules/m1-marche.jpg',
     imageAlt: "Graphique de marché avec chandeliers et courbes de prix",
     path: '/marche',
+  },
+  {
+    id: 'game-room',
+    number: 'M2',
+    title: 'Game Room — Simulation Pédagogique',
+    role: 'Étudiant & Formateur',
+    question: 'Comment réagir face aux scénarios de crise et chocs de marché ?',
+    description:
+      'Participe à des séances de marché scénarisées (« Le mardi de la panique »). Portefeuille virtuel dédié (100 000 $), carnet dynamique, contrôles formateur, rollback et assistant IA.',
+    tags: ['Multi-participants', 'Scénarios & Chocs', 'Meneur de jeu', 'Rollback', 'Assistant IA'],
+    accent: '#3fd1a0',
+    image: '/images/modules/m4-meneur-jeu.jpg',
+    imageAlt: 'Salle de simulation pédagogique avec contrôle enseignant et participants',
+    path: '/game-room',
   },
 ];

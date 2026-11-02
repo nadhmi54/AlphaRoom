@@ -45,6 +45,18 @@ describe('UserMenu', () => {
     expect(signOut).toHaveBeenCalled();
   });
 
+  it("connecté : lien « Mes bilans IA » pour tous, espace enseignant pour le meneur de jeu et l'admin seulement", () => {
+    const { unmount } = renderSignedIn({ fullName: 'Étudiant', role: 'trader' });
+    fireEvent.click(screen.getByRole('button', { name: 'Compte' }));
+    expect(screen.getByRole('menuitem', { name: 'Mes bilans IA' })).toHaveAttribute('href', '/ia/mes-bilans');
+    expect(screen.queryByRole('menuitem', { name: 'Espace enseignant IA' })).toBeNull();
+    unmount();
+
+    renderSignedIn({ fullName: 'Prof', role: 'game_master' });
+    fireEvent.click(screen.getByRole('button', { name: 'Compte' }));
+    expect(screen.getByRole('menuitem', { name: 'Espace enseignant IA' })).toHaveAttribute('href', '/ia/enseignant');
+  });
+
   it("connecté en admin : lien Administration", () => {
     renderSignedIn({ fullName: 'Admin', role: 'admin' });
     fireEvent.click(screen.getByRole('button', { name: 'Compte' }));

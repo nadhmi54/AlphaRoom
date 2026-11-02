@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { Auth } from '../../users/auth.decorator.js';
+import { TRADING_ROLES } from '../../users/user-role.enum.js';
 import { CurrentProfile } from '../../users/current-profile.decorator.js';
 import type { Profile } from '../../users/profile.entity.js';
 import { BookQueryDto } from './dto/book-query.dto.js';
@@ -12,7 +13,7 @@ import { OrderBookService } from './order-book.service.js';
  * API du carnet d'ordres (M1). Le carnet est global par actif : tout le monde
  * s'apparie contre le même carnet, sans auto-appariement.
  */
-@Auth()
+@Auth(...TRADING_ROLES)
 @Controller('orders')
 export class OrderBookController {
   constructor(private readonly book: OrderBookService) {}

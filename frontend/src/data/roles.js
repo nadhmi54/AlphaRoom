@@ -8,6 +8,13 @@ export const ROLES = [
   { value: 'admin', label: 'Administrateur' },
 ];
 
+// M1 (marché & portefeuille) est le poste du trader : le meneur de jeu n'y a
+// pas accès, il travaille dans la Game Room. La liste est dérivée de ROLES pour
+// rester exacte si un rôle est ajouté. Le backend applique la même règle.
+export const TRADING_ROLES = ROLES.filter((role) => role.value !== 'game_master').map(
+  (role) => role.value,
+);
+
 // Description et couleur d'accent de chaque rôle (page Profil).
 export const ROLE_INFO = {
   trader: { accent: '#2dd4bf', description: 'Passe des ordres, gère un portefeuille et suit les marchés en temps réel.' },
