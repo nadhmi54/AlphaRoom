@@ -19,6 +19,17 @@ const describeError = (error) =>
     ? "Connectez-vous pour voir les prix en direct."
     : error?.message || "Les prix en direct sont indisponibles.";
 
+/** Ajoute un point en respectant le pas et la fenêtre de la plage choisie. */
+const appendPoint = (points, t, price, windowMs, stepMs) => {
+  const last = points.at(-1);
+  if (last && t - last.t < stepMs) return points;
+  const grown = [...points, { t, price }];
+  const oldest = t - windowMs;
+  let start = 0;
+  while (start < grown.length - 2 && grown[start].t < oldest) start += 1;
+  return start ? grown.slice(start) : grown;
+};
+
 /**
  * Prix en direct + courbe de l'actif choisi.
  *
@@ -40,8 +51,8 @@ export default function useLiveMarket(symbol, range) {
   const [series, setSeries]                 = useState([]);
   const [error, setError]                   = useState("");
   const [loadingSeries, setLoadingSeries]   = useState(true);
-  // `customQuote` utilise le symbole Binance brut (ex. "BNBUSDT") comme clé
-  // pour que selected = quotes.find(q => q.symbol === symbol) fonctionne.
+  // `customQuote` réutilise le symbole courant comme clé pour que
+  // selected = quotes.find(q => q.symbol === symbol) fonctionne.
   const [customQuote, setCustomQuote]       = useState(null);
 
   const isCustom = Boolean(symbol) && !NATIVE_SYMBOLS.has(symbol);
@@ -89,15 +100,7 @@ export default function useLiveMarket(symbol, range) {
       if (!quote) return;
       const t = Date.parse(quote.updatedAt);
       const { windowMs, stepMs } = RANGES[wantedRange];
-      setSeries((pts) => {
-        const last = pts.at(-1);
-        if (last && t - last.t < stepMs) return pts;
-        const grown = [...pts, { t, price: quote.price }];
-        const oldest = t - windowMs;
-        let s = 0;
-        while (s < grown.length - 2 && grown[s].t < oldest) s++;
-        return s ? grown.slice(s) : grown;
-      });
+      setSeries((pts) => appendPoint(pts, t, quote.price, windowMs, stepMs));
     } catch (err) {
       stopped.current = err instanceof ApiError && err.status === 401;
       setError(describeError(err));
@@ -135,8 +138,8 @@ export default function useLiveMarket(symbol, range) {
         const spot = await getSpotPrice(symbol);
         if (cancelled || !spot.found) return;
         const t = Date.now();
-        // On garde symbol (ex. "BNBUSDT") comme clé — pas displaySymbol ("BNB/USDT")
-        // pour que selected = quotes.find(q => q.symbol === symbol) fonctionne.
+        // On garde le symbole courant (ex. « BNB/USDT ») comme clé unique pour
+        // que selected = quotes.find(q => q.symbol === symbol) fonctionne.
         setCustomQuote({
           symbol:        symbol,
           name:          spot.name ?? symbol,
@@ -154,15 +157,7 @@ export default function useLiveMarket(symbol, range) {
 
         const { range: wantedRange } = current.current;
         const { windowMs, stepMs } = RANGES[wantedRange];
-        setSeries((pts) => {
-          const last = pts.at(-1);
-          if (last && t - last.t < stepMs) return pts;
-          const grown = [...pts, { t, price: spot.price }];
-          const oldest = t - windowMs;
-          let s = 0;
-          while (s < grown.length - 2 && grown[s].t < oldest) s++;
-          return s ? grown.slice(s) : grown;
-        });
+        setSeries((pts) => appendPoint(pts, t, spot.price, windowMs, stepMs));
       } catch (err) {
         if (!cancelled) setError(describeError(err));
       }

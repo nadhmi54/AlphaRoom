@@ -81,6 +81,8 @@ npm test
 Résultats : backend build OK, lint OK (2 warnings préexistants), **470 tests OK** ;
 frontend build OK, lint OK, **118 tests OK**.
 
+Nettoyage du code mort (exports inutilisés, branche morte, doublons `quoteView`/`appendPoint`, `hasUsablePrice`) : build/lint/tests inchangés.
+
 ## Ce qui reste à vérifier / faire
 
 1. **Vérification en conditions réelles** : redémarrer le backend puis tester

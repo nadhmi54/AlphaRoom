@@ -21,18 +21,11 @@ const UNKNOWN_ROOM_ASSET = {
   price: 0,
   decimals: 2,
   qtyDecimals: 6,
-  known: false,
 };
 
 export function findRoomAsset(symbol) {
   const asset = ROOM_ASSETS.find((item) => item.symbol === symbol);
   return asset ?? { ...UNKNOWN_ROOM_ASSET, symbol: symbol ?? '' };
-}
-
-/** Vrai seulement si l'actif est connu ET dispose d'un prix utilisable. */
-export function hasUsablePrice(symbol) {
-  const asset = ROOM_ASSETS.find((item) => item.symbol === symbol);
-  return Boolean(asset && Number(asset.price) > 0);
 }
 
 export function assetUnit(symbol) {
