@@ -1,4 +1,5 @@
-export type AssetCategory = 'commodity' | 'forex' | 'crypto' | 'stock';
+export const ASSET_CATEGORIES = ['crypto', 'stock', 'commodity', 'forex'] as const;
+export type AssetCategory = (typeof ASSET_CATEGORIES)[number];
 
 /**
  * Origine du prix porté par l'actif.
@@ -28,6 +29,34 @@ export const MARKET_ASSETS: readonly MarketAsset[] = [
   { symbol: 'EUR/USD', name: 'Euro/Dollar', unit: 'EUR', category: 'forex', currency: 'USD', price: 1.0834, source: 'demo-fixed-price' },
   { symbol: 'BTC/USD', name: 'Bitcoin', unit: 'BTC', category: 'crypto', currency: 'USD', price: 67500, source: 'demo-fixed-price' },
   { symbol: 'AAPL', name: 'Apple', unit: 'action', category: 'stock', currency: 'USD', price: 224.5, source: 'demo-fixed-price' },
+];
+
+/**
+ * Catalogue des instruments proposés à la recherche, en plus des 4 actifs
+ * natifs. Les prix sont des valeurs de démonstration fixes (comme MARKET_ASSETS) :
+ * ils permettent au carnet, au portefeuille et à l'ordre rapide de fonctionner
+ * sans dépendre d'un flux temps réel pour chaque place de marché.
+ */
+export const CATALOG_ASSETS: readonly MarketAsset[] = [
+  // Actions US
+  { symbol: 'MSFT', name: 'Microsoft', unit: 'action', category: 'stock', currency: 'USD', price: 421.3, source: 'demo-fixed-price' },
+  { symbol: 'GOOGL', name: 'Alphabet (Google)', unit: 'action', category: 'stock', currency: 'USD', price: 172.8, source: 'demo-fixed-price' },
+  { symbol: 'AMZN', name: 'Amazon', unit: 'action', category: 'stock', currency: 'USD', price: 186.4, source: 'demo-fixed-price' },
+  { symbol: 'TSLA', name: 'Tesla', unit: 'action', category: 'stock', currency: 'USD', price: 248.9, source: 'demo-fixed-price' },
+  { symbol: 'NVDA', name: 'NVIDIA', unit: 'action', category: 'stock', currency: 'USD', price: 118.6, source: 'demo-fixed-price' },
+  { symbol: 'META', name: 'Meta Platforms', unit: 'action', category: 'stock', currency: 'USD', price: 512.4, source: 'demo-fixed-price' },
+  // Matières premières
+  { symbol: 'XAG/USD', name: 'Argent', unit: 'once troy (oz)', category: 'commodity', currency: 'USD', price: 31.25, source: 'demo-fixed-price' },
+  { symbol: 'WTI/USD', name: 'Pétrole WTI', unit: 'baril', category: 'commodity', currency: 'USD', price: 72.4, source: 'demo-fixed-price' },
+  { symbol: 'BRENT/USD', name: 'Pétrole Brent', unit: 'baril', category: 'commodity', currency: 'USD', price: 76.1, source: 'demo-fixed-price' },
+  { symbol: 'NATGAS/USD', name: 'Gaz naturel', unit: 'MMBtu', category: 'commodity', currency: 'USD', price: 2.95, source: 'demo-fixed-price' },
+  { symbol: 'COPPER/USD', name: 'Cuivre', unit: 'livre', category: 'commodity', currency: 'USD', price: 4.35, source: 'demo-fixed-price' },
+  // Devises
+  { symbol: 'GBP/USD', name: 'Livre sterling/Dollar', unit: 'GBP', category: 'forex', currency: 'USD', price: 1.2712, source: 'demo-fixed-price' },
+  { symbol: 'USD/JPY', name: 'Dollar/Yen', unit: 'USD', category: 'forex', currency: 'USD', price: 149.85, source: 'demo-fixed-price' },
+  { symbol: 'USD/CHF', name: 'Dollar/Franc suisse', unit: 'USD', category: 'forex', currency: 'USD', price: 0.882, source: 'demo-fixed-price' },
+  { symbol: 'AUD/USD', name: 'Dollar australien/Dollar', unit: 'AUD', category: 'forex', currency: 'USD', price: 0.658, source: 'demo-fixed-price' },
+  { symbol: 'USD/CAD', name: 'Dollar/Dollar canadien', unit: 'USD', category: 'forex', currency: 'USD', price: 1.364, source: 'demo-fixed-price' },
 ];
 
 // ── Registre global des actifs négociables (démarre avec MARKET_ASSETS) ─────────
@@ -96,6 +125,9 @@ function remember(asset: MarketAsset) {
 
 // Les 4 actifs natifs sont toujours connus.
 for (const asset of MARKET_ASSETS) remember(asset);
+// Le catalogue (actions, matières premières, devises) est négociable lui aussi :
+// le carnet trouve ainsi un prix de référence pour ces instruments.
+for (const asset of CATALOG_ASSETS) remember(asset);
 
 /** Tous les actifs actuellement négociables (natifs + actifs découverts). */
 export function tradableAssets(): readonly MarketAsset[] {
@@ -155,4 +187,35 @@ export function resolveMarketAsset(symbol: string): MarketAsset {
 /** Symbole Binance brut (`BNB/USDT` → `BNBUSDT`). */
 export function toBinanceSymbol(symbol: string): string {
   return symbolKey(symbol);
+}
+
+/** Compare sans tenir compte des accents ni de la casse (« petrole » = « Pétrole »). */
+function fold(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase();
+}
+
+/**
+ * Recherche dans le catalogue d'un marché (actions, matières premières,
+ * devises). La crypto reste servie par la recherche Binance dans le contrôleur.
+ * Une requête vide renvoie les instruments du marché : l'interface s'en sert
+ * comme suggestions à l'ouverture de la barre de recherche.
+ */
+export function searchInstruments(
+  category: AssetCategory,
+  query: string,
+  limit = 12,
+): MarketAsset[] {
+  const needle = fold(query.trim());
+  const found = new Map<string, MarketAsset>();
+  for (const asset of [...MARKET_ASSETS, ...CATALOG_ASSETS]) {
+    if (asset.category !== category) continue;
+    if (needle && !fold(asset.symbol).includes(needle) && !fold(asset.name).includes(needle)) {
+      continue;
+    }
+    found.set(asset.symbol, asset);
+  }
+  return [...found.values()].slice(0, limit);
 }

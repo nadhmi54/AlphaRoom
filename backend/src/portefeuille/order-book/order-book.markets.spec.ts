@@ -171,7 +171,7 @@ function seedPosition(
   });
 }
 
-/** Les actifs exigés : crypto (native et Binance), or, forex et action. */
+/** Les actifs exigés : crypto (native et Binance), or, forex, actions et pétrole. */
 const ASSETS = [
   { symbol: 'ETH/USDT', binanceSymbol: 'ETHUSDT', price: 2500, quantity: 1 },
   { symbol: 'BNB/USDT', binanceSymbol: 'BNBUSDT', price: 700, quantity: 1 },
@@ -181,6 +181,9 @@ const ASSETS = [
   { symbol: 'XAU/USD', binanceSymbol: null, price: 2685.4, quantity: 0.5 },
   { symbol: 'EUR/USD', binanceSymbol: null, price: 1.0834, quantity: 100 },
   { symbol: 'AAPL', binanceSymbol: null, price: 224.5, quantity: 1 },
+  { symbol: 'MSFT', binanceSymbol: null, price: 421.3, quantity: 10 },
+  { symbol: 'WTI/USD', binanceSymbol: null, price: 72.4, quantity: 10 },
+  { symbol: 'GBP/USD', binanceSymbol: null, price: 1.2712, quantity: 1000 },
 ] as const;
 
 const binancePrices = Object.fromEntries(

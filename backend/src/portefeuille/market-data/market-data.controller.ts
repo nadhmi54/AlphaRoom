@@ -4,7 +4,12 @@ import { TRADING_ROLES } from '../../users/user-role.enum.js';
 import { BinanceRestService } from './binance-rest.service.js';
 import { HistoryQueryDto, SearchQueryDto, SpotQueryDto } from './dto/history-query.dto.js';
 import { MarketDataService } from './market-data.service.js';
-import { findMarketAsset } from '../trading/market-assets.js';
+import {
+  MARKET_ASSETS,
+  findMarketAsset,
+  normalizeSymbol,
+  searchInstruments,
+} from '../trading/market-assets.js';
 
 @Auth(...TRADING_ROLES)
 @Controller('market')
@@ -25,8 +30,10 @@ export class MarketDataController {
    * - Paire Binance arbitraire (ETHUSDT, SOLUSDT…) : klines via l'API REST Binance.
    */
   @Get('history') async history(@Query() query: HistoryQueryDto) {
-    const isKnown = Boolean(findMarketAsset(query.symbol));
-    if (isKnown) return this.market.history(query.symbol, query.range);
+    const isEngineAsset = MARKET_ASSETS.some(
+      (asset) => normalizeSymbol(asset.symbol) === normalizeSymbol(query.symbol),
+    );
+    if (isEngineAsset) return this.market.history(query.symbol, query.range);
 
     // Paire Binance arbitraire : on vérifie que le symbole ressemble à un symbole
     // Binance valide (lettres majuscules uniquement) avant de le transmettre.
@@ -44,20 +51,62 @@ export class MarketDataController {
   }
 
   /**
-   * Recherche de paires Binance dont le nom commence par `q`.
-   * Retourne au plus 10 résultats avec prix actuel.
-   * Exemples : ?q=ETH → ETHUSDT, ETHBTC… ; ?q=SOL → SOLUSDT…
+   * Recherche d'actifs dans le marché choisi.
+   * - crypto : paires Binance (recherche texte ou suggestions populaires) ;
+   * - stock / commodity / forex : catalogue local, filtré par nom ou symbole.
+   * Exemples : ?q=ETH&market=crypto ; ?q=Microsoft&market=stock ;
+   *            ?q=pétrole&market=commodity ; ?q=GBP&market=forex.
    */
   @Get('search') async search(@Query() query: SearchQueryDto) {
-    const results = await this.binanceRest.search(query.q);
-    return { results };
+    if (query.market === 'crypto') {
+      const hits = query.q.trim()
+        ? await this.binanceRest.search(query.q)
+        : await this.binanceRest.popular();
+      return {
+        results: hits.map((item) => ({
+          ...item,
+          symbol: item.displaySymbol,
+          market: 'crypto' as const,
+          source: 'live' as const,
+          unit: item.displaySymbol.split('/')[0],
+        })),
+      };
+    }
+
+    return {
+      results: searchInstruments(query.market, query.q).map((asset) => ({
+        symbol: asset.symbol,
+        displaySymbol: asset.symbol,
+        name: asset.name,
+        unit: asset.unit,
+        price: asset.price,
+        market: asset.category,
+        source: asset.source,
+      })),
+    };
   }
 
   /**
-   * Prix spot en temps réel d'une paire Binance arbitraire.
-   * Utilisé pour rafraîchir le prix d'un actif custom sélectionné depuis la recherche.
+   * Prix spot d'un actif.
+   * - Actif du catalogue (MSFT, WTI/USD, GBP/USD…) : prix de démonstration local.
+   * - Paire Binance arbitraire (ETHUSDT, BNB/USDT…) : prix réel via l'API REST.
    */
   @Get('spot') async spot(@Query() query: SpotQueryDto) {
+    const asset = findMarketAsset(query.symbol);
+    if (asset && asset.price > 0) {
+      return {
+        symbol: asset.symbol,
+        displaySymbol: asset.symbol,
+        name: asset.name,
+        unit: asset.unit,
+        category: asset.category,
+        price: asset.price,
+        source: asset.source,
+        updatedAt: new Date().toISOString(),
+        found: true,
+      };
+    }
+
     const safe = query.symbol.toUpperCase().replace(/[^A-Z0-9]/g, '');
     const price = await this.binanceRest.getPrice(safe);
     if (price === null) return { symbol: query.symbol, price: null, found: false };
@@ -65,6 +114,8 @@ export class MarketDataController {
       symbol: query.symbol,
       displaySymbol: this.binanceRest.toDisplay(safe),
       name: this.binanceRest.toName(safe),
+      unit: this.binanceRest.toDisplay(safe).split('/')[0],
+      category: 'crypto' as const,
       price,
       source: 'live' as const,
       updatedAt: new Date().toISOString(),

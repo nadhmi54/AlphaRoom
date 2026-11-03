@@ -5,6 +5,7 @@ import {
   findMarketAsset,
   normalizeSymbol,
   resolveMarketAsset,
+  searchInstruments,
   toBinanceSymbol,
 } from './market-assets.js';
 
@@ -42,5 +43,36 @@ describe('market-assets — registre et normalisation', () => {
     const gold = resolveMarketAsset('XAU/USD');
     expect(gold.price).toBeGreaterThan(0);
     expect(gold.source).toBe('demo-fixed-price');
+  });
+
+  it('le catalogue fournit un prix aux actions, matières premières et devises', () => {
+    const microsoft = resolveMarketAsset('MSFT');
+    expect(microsoft.category).toBe('stock');
+    expect(microsoft.price).toBeGreaterThan(0);
+
+    const oil = resolveMarketAsset('WTI/USD');
+    expect(oil.category).toBe('commodity');
+    expect(oil.price).toBeGreaterThan(0);
+
+    const pound = resolveMarketAsset('GBP/USD');
+    expect(pound.category).toBe('forex');
+    expect(pound.price).toBeGreaterThan(0);
+  });
+
+  it.each([
+    ['stock', 'Microsoft', 'MSFT'],
+    ['stock', 'aapl', 'AAPL'],
+    ['commodity', 'petrole', 'WTI/USD'],
+    ['commodity', 'argent', 'XAG/USD'],
+    ['forex', 'livre', 'GBP/USD'],
+    ['forex', 'jpy', 'USD/JPY'],
+  ] as const)('recherche %s « %s » → %s', (market, query, symbol) => {
+    expect(searchInstruments(market, query).map((asset) => asset.symbol)).toContain(symbol);
+  });
+
+  it('une recherche vide renvoie les instruments du marché choisi', () => {
+    const stocks = searchInstruments('stock', '');
+    expect(stocks.length).toBeGreaterThan(0);
+    expect(stocks.every((asset) => asset.category === 'stock')).toBe(true);
   });
 });

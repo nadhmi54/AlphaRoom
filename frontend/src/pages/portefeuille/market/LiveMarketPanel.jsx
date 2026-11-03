@@ -38,15 +38,50 @@ function SourceBadge({ source }) {
 const signed = (value) =>
   `${value > 0 ? "+" : ""}${new Intl.NumberFormat("fr-FR", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value)}`;
 
+/** Les quatre marchés proposés par la barre de recherche. */
+const MARKETS = [
+  {
+    id: "crypto",
+    label: "Crypto",
+    icon: "₿",
+    hint: "BTC, ETH, BNB, SOL…",
+    placeholder: "Rechercher une crypto… (BTC, ETH, SOL…)",
+  },
+  {
+    id: "stock",
+    label: "Actions",
+    icon: "▤",
+    hint: "Apple, Microsoft, Tesla…",
+    placeholder: "Rechercher une action… (AAPL, MSFT, TSLA…)",
+  },
+  {
+    id: "commodity",
+    label: "Matières premières",
+    icon: "◈",
+    hint: "Or, pétrole, argent…",
+    placeholder: "Rechercher une matière première… (or, pétrole…)",
+  },
+  {
+    id: "forex",
+    label: "Devises",
+    icon: "€$",
+    hint: "EUR/USD, GBP/USD…",
+    placeholder: "Rechercher une devise… (EUR/USD, GBP/USD…)",
+  },
+];
+
+const marketById = (id) => MARKETS.find((market) => market.id === id) ?? MARKETS[0];
+
 /**
- * Barre de recherche d'actifs avec suggestions Binance.
- * Appelle onSelect(binanceSymbol) quand l'utilisateur choisit un résultat.
+ * Barre de recherche d'actifs, limitée au marché choisi.
+ * Appelle onSelect(symbol) quand l'utilisateur choisit un résultat.
  */
-function SymbolSearchBar({ onSelect }) {
-  const { query, results, searching, search, reset } = useSymbolSearch();
+function SymbolSearchBar({ market, onSelect }) {
+  const { query, results, searching, search, reset } = useSymbolSearch(market);
   const [open, setOpen] = useState(false);
   const inputRef = useRef(null);
   const containerRef = useRef(null);
+  const meta = marketById(market);
 
   // Fermer la liste au clic en dehors
   useEffect(() => {
@@ -59,17 +94,26 @@ function SymbolSearchBar({ onSelect }) {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  // Changer de marché ferme les résultats du marché précédent.
+  useEffect(() => {
+    setOpen(false);
+  }, [market]);
+
   const handleChange = (e) => {
     const value = e.target.value;
     search(value);
-    setOpen(Boolean(value.trim()));
+    setOpen(true);
   };
 
-  const handleSelect = (binanceSymbol) => {
-    // On garde le symbole d'affichage canonique (BNB/USDT) : il est identique
-    // côté backend et évite de fragmenter le carnet/les positions entre
-    // « BNBUSDT » et « BNB/USDT ».
-    onSelect(binanceSymbol);
+  const handleFocus = () => {
+    setOpen(true);
+    // Champ vide : on affiche les suggestions du marché.
+    if (!query.trim()) search("");
+  };
+
+  const handleSelect = (item) => {
+    // Le backend renvoie toujours un symbole canonique (BNB/USDT, MSFT, EUR/USD).
+    onSelect(item.symbol ?? item.displaySymbol ?? item.binanceSymbol);
     reset();
     setOpen(false);
     inputRef.current?.blur();
@@ -93,12 +137,12 @@ function SymbolSearchBar({ onSelect }) {
           ref={inputRef}
           type="text"
           className="lm-search__input"
-          placeholder="Rechercher un actif… (ETH, SOL, BNB…)"
+          placeholder={meta.placeholder}
           value={query}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
-          onFocus={() => query.trim() && setOpen(true)}
-          aria-label="Rechercher un actif"
+          onFocus={handleFocus}
+          aria-label={`Rechercher un actif ${meta.label.toLowerCase()}`}
           aria-autocomplete="list"
           aria-expanded={open && results.length > 0}
           autoComplete="off"
@@ -118,20 +162,23 @@ function SymbolSearchBar({ onSelect }) {
       </div>
 
       {open && results.length > 0 && (
-        <ul className="lm-search__dropdown" role="listbox" aria-label="Résultats de recherche">
-          {results.map((item) => (
-            <li key={item.binanceSymbol} role="option">
-              <button
-                type="button"
-                className="lm-search__result"
-                onClick={() => handleSelect(item.displaySymbol ?? item.binanceSymbol)}
-              >
-                <span className="lm-search__result-symbol">{item.displaySymbol}</span>
-                <span className="lm-search__result-name">{item.name}</span>
-                <span className="lm-search__result-price">{formatPrice(item.price)}</span>
-              </button>
-            </li>
-          ))}
+        <ul className="lm-search__dropdown" role="listbox" aria-label={`Résultats ${meta.label}`}>
+          {results.map((item) => {
+            const symbol = item.symbol ?? item.binanceSymbol ?? item.displaySymbol;
+            return (
+              <li key={symbol} role="option">
+                <button
+                  type="button"
+                  className="lm-search__result"
+                  onClick={() => handleSelect(item)}
+                >
+                  <span className="lm-search__result-symbol">{item.displaySymbol ?? symbol}</span>
+                  <span className="lm-search__result-name">{item.name}</span>
+                  <span className="lm-search__result-price">{formatPrice(item.price)}</span>
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
 
@@ -143,9 +190,9 @@ function SymbolSearchBar({ onSelect }) {
 }
 
 /**
- * Scène « marché » : cartes des actifs (prix + mini-courbe qui bougent chaque
- * seconde), barre de recherche Binance, grand graphique de l'actif choisi avec
- * ta ligne d'achat moyen, et l'ordre rapide.
+ * Scène « marché » : sélecteur des quatre marchés (crypto, actions, matières
+ * premières, devises) avec la barre de recherche correspondante, grand graphique
+ * de l'actif choisi avec ta ligne d'achat moyen, et l'ordre rapide.
  */
 export default function LiveMarketPanel({
   market,
@@ -167,6 +214,16 @@ export default function LiveMarketPanel({
   const asset = assets.find((item) => item.symbol === symbol);
   const flash = usePriceFlash(selected?.price);
 
+  // Le marché affiché dans le sélecteur suit l'actif choisi (une action
+  // sélectionnée ailleurs dans la page ouvre bien l'onglet « Actions »).
+  const currentMarket = selected?.category ?? asset?.category;
+  const [searchMarket, setSearchMarket] = useState(() => marketById(currentMarket).id);
+  useEffect(() => {
+    if (currentMarket && MARKETS.some((item) => item.id === currentMarket)) {
+      setSearchMarket(currentMarket);
+    }
+  }, [currentMarket, symbol]);
+
   const first = series[0]?.price;
   const rangeChange = first && selected ? ((selected.price - first) / first) * 100 : 0;
 
@@ -183,9 +240,32 @@ export default function LiveMarketPanel({
 
   return (
     <section className={`lm-panel${focus ? " is-focus" : ""}`} aria-label="Marché en direct">
+      {/* Sélecteur de marché à gauche + recherche adaptée au marché choisi. */}
+      <div className="lm-market-bar">
+        <nav className="lm-market-nav" aria-label="Marchés disponibles">
+          <span className="lm-market-nav__title">Marchés</span>
+          <div className="lm-market-nav__list" role="group" aria-label="Choisir un marché">
+            {MARKETS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`lm-market-nav__btn${searchMarket === item.id ? " is-active" : ""}`}
+                aria-pressed={searchMarket === item.id}
+                title={item.hint}
+                onClick={() => setSearchMarket(item.id)}
+              >
+                <span className="lm-market-nav__icon" aria-hidden="true">{item.icon}</span>
+                <span className="lm-market-nav__label">{item.label}</span>
+              </button>
+            ))}
+          </div>
+        </nav>
 
-      {/* Barre de recherche — les 4 cartes fixes sont supprimées */}
-      <SymbolSearchBar onSelect={onSymbolChange} />
+        <div className="lm-market-bar__search">
+          <SymbolSearchBar market={searchMarket} onSelect={onSymbolChange} />
+          <p className="lm-market-bar__hint">{marketById(searchMarket).hint}</p>
+        </div>
+      </div>
 
       {error && (
         <div className="lm-error" role="alert">

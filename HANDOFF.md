@@ -83,6 +83,23 @@ frontend build OK, lint OK, **118 tests OK**.
 
 Nettoyage du code mort (exports inutilisés, branche morte, doublons `quoteView`/`appendPoint`, `hasUsablePrice`) : build/lint/tests inchangés.
 
+### Étape 3 — Quatre marchés (crypto, actions, matières premières, devises)
+
+- Backend : catalogue `CATALOG_ASSETS` (MSFT, GOOGL, AMZN, TSLA, NVDA, META,
+  XAG/USD, WTI/USD, BRENT/USD, NATGAS/USD, COPPER/USD, GBP/USD, USD/JPY,
+  USD/CHF, AUD/USD, USD/CAD) avec prix de démonstration fixes, enregistré dans
+  `TRADABLE_ASSETS` : carnet, positions et ordre rapide fonctionnent.
+- `searchInstruments(category, query)` filtre par nom ou symbole, sans accents
+  (« petrole » trouve « Pétrole ») ; requête vide = suggestions du marché.
+- `GET /market/search?market=…&q=…` : crypto via Binance (ou paires populaires à
+  vide), autres marchés via le catalogue. `GET /market/spot` renvoie le prix du
+  catalogue pour ces symboles. L'historique moteur reste réservé aux 4 natifs.
+- Frontend : rail des 4 marchés à gauche de la barre de recherche, placeholder et
+  suggestions adaptés au marché choisi, onglet synchronisé avec la catégorie de
+  l'actif sélectionné ; mise en page responsive (rail horizontal < 1100 px).
+- Résultats : backend build/lint OK, **484 tests OK** ; frontend build/lint OK,
+  **120 tests OK** (dont les 4 boutons de marché et les placeholders).
+
 ## Ce qui reste à vérifier / faire
 
 1. **Vérification en conditions réelles** : redémarrer le backend puis tester
@@ -101,6 +118,7 @@ Nettoyage du code mort (exports inutilisés, branche morte, doublons `quoteView`
 ## Prochaine action exacte
 
 Redémarrer le backend (`cd backend; npm run start:dev`) et, dans `/marche`,
-rechercher « BNB », choisir BNB/USDT, vérifier que le carnet s'affiche, puis
-acheter 1 BNB et revendre la position. Si un cas échoue, ajouter le scénario
-correspondant dans `backend/src/portefeuille/order-book/order-book.markets.spec.ts`.
+vérifier les 4 marchés : Crypto → BNB/USDT, Actions → MSFT, Matières premières →
+WTI/USD, Devises → GBP/USD. Rechercher, vérifier le carnet, puis acheter et
+revendre. Si un cas échoue, ajouter le scénario correspondant dans
+`backend/src/portefeuille/order-book/order-book.markets.spec.ts`.
