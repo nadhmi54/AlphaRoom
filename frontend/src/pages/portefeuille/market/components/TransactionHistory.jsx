@@ -1,14 +1,22 @@
 import { formatPrice, formatClock } from "../format-market.js";
 import "./TransactionHistory.css";
 
-export default function TransactionHistory({ transactions, loading, filters, onFilterChange, pagination, onPageChange }) {
-  const assets = ['XAU/USD', 'EUR/USD', 'BTC/USD', 'AAPL'];
+export default function TransactionHistory({ transactions, assets = [], loading, filters, onFilterChange, pagination, onPageChange }) {
+  // La liste complète des actifs vient de l'API (et non de la page courante de
+  // transactions, qui ne contient que quelques symboles).
+  const symbols = assets.length
+    ? assets.map((asset) => ({ symbol: asset.symbol, name: asset.name }))
+    : ['XAU/USD', 'EUR/USD', 'BTC/USD', 'AAPL'].map((symbol) => ({ symbol, name: symbol }));
   return (
     <div className="tx-history">
       <div className="filters-bar">
         <select value={filters.symbol} onChange={(e) => onFilterChange('symbol', e.target.value)}>
           <option value="">Tous les actifs</option>
-          {assets.map(a => <option key={a} value={a}>{a}</option>)}
+          {symbols.map((asset) => (
+            <option key={asset.symbol} value={asset.symbol}>
+              {asset.name && asset.name !== asset.symbol ? `${asset.name} · ${asset.symbol}` : asset.symbol}
+            </option>
+          ))}
         </select>
         <select value={filters.side} onChange={(e) => onFilterChange('side', e.target.value)}>
           <option value="">Tous les sens</option>

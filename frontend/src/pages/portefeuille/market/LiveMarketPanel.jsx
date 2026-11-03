@@ -66,6 +66,9 @@ function SymbolSearchBar({ onSelect }) {
   };
 
   const handleSelect = (binanceSymbol) => {
+    // On garde le symbole d'affichage canonique (BNB/USDT) : il est identique
+    // côté backend et évite de fragmenter le carnet/les positions entre
+    // « BNBUSDT » et « BNB/USDT ».
     onSelect(binanceSymbol);
     reset();
     setOpen(false);
@@ -121,7 +124,7 @@ function SymbolSearchBar({ onSelect }) {
               <button
                 type="button"
                 className="lm-search__result"
-                onClick={() => handleSelect(item.binanceSymbol)}
+                onClick={() => handleSelect(item.displaySymbol ?? item.binanceSymbol)}
               >
                 <span className="lm-search__result-symbol">{item.displaySymbol}</span>
                 <span className="lm-search__result-name">{item.name}</span>

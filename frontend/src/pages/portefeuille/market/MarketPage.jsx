@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import ModuleShell from "../../../components/ModuleShell/ModuleShell.jsx";
+import { getTradingAssets } from "../../../services/tradingService.js";
 import useMarketStream from "./hooks/useMarketStream.js";
 import useTransactions from "./hooks/useTransactions.js";
 import QuotesTable from "./components/QuotesTable.jsx";
@@ -8,6 +10,16 @@ import "./MarketPage.css";
 
 export default function MarketPage() {
   const { quotes, isConnected, error: streamError } = useMarketStream();
+  // Liste complète des actifs négociables (natifs + paires découvertes déjà
+  // négociées) pour alimenter le filtre de l'historique.
+  const [assets, setAssets] = useState([]);
+  useEffect(() => {
+    let alive = true;
+    getTradingAssets()
+      .then((next) => { if (alive) setAssets(next); })
+      .catch(() => { if (alive) setAssets([]); });
+    return () => { alive = false; };
+  }, []);
   const { 
     transactions, 
     loading, 
@@ -51,6 +63,7 @@ export default function MarketPage() {
           </div>
           <TransactionHistory 
             transactions={transactions} 
+            assets={assets}
             loading={loading}
             filters={filters}
             onFilterChange={setFilter}

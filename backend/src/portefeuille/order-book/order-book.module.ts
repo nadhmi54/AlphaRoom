@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { BinanceRestModule } from '../market-data/binance-rest.module.js';
 import { TradingModule } from '../trading/trading.module.js';
 import { MarketOrderCompatController } from './market-order-compat.controller.js';
 import { OrderBookMark } from './order-book-mark.entity.js';
@@ -13,7 +14,7 @@ import { Order } from './order.entity.js';
  * historique) dans la même transaction SQL.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([Order, OrderBookMark]), TradingModule],
+  imports: [TypeOrmModule.forFeature([Order, OrderBookMark]), TradingModule, BinanceRestModule],
   controllers: [OrderBookController, MarketOrderCompatController],
   providers: [OrderBookService],
   exports: [OrderBookService],

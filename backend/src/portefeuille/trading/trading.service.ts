@@ -11,7 +11,7 @@ import { TradingPortfolio } from './portfolio.entity.js';
 import { TradingPosition } from './position.entity.js';
 import { TradeExecution } from './trade-execution.entity.js';
 import type { PortfolioHistoryQueryDto } from './dto/portfolio-history-query.dto.js';
-import { findMarketAsset, MARKET_ASSETS } from './market-assets.js';
+import { MARKET_ASSETS, resolveMarketAsset, tradableAssets, type MarketAsset } from './market-assets.js';
 
 const STARTING_CASH = '100000.00';
 
@@ -57,11 +57,21 @@ export class TradingService {
 
   async getAssets() {
     const prices = await this.priceMap();
-    return MARKET_ASSETS.map((asset) => ({
-      ...asset,
-      price: prices.get(asset.symbol) ?? asset.price,
-      referencePrice: asset.price,
-    }));
+    const assets = new Map<string, MarketAsset>();
+    for (const asset of tradableAssets()) assets.set(asset.symbol, asset);
+    // Tout symbole déjà négocié (donc présent dans order_book_marks) devient un
+    // actif affichable, même s'il a été découvert via la recherche Binance.
+    for (const symbol of prices.keys()) {
+      if (!assets.has(symbol)) assets.set(symbol, resolveMarketAsset(symbol));
+    }
+    return [...assets.values()].map((asset) => {
+      const price = prices.get(asset.symbol) ?? asset.price;
+      return {
+        ...asset,
+        price,
+        referencePrice: asset.price > 0 ? asset.price : price,
+      };
+    });
   }
 
   async getPortfolio(ownerId: string, filters: PortfolioHistoryQueryDto) {
@@ -252,14 +262,21 @@ export class TradingService {
 
   async getQuote(symbol?: string) {
     const prices = await this.priceMap();
-    const quote = (asset: (typeof MARKET_ASSETS)[number]) => ({
-      ...asset,
-      price: prices.get(asset.symbol) ?? asset.price,
-      referencePrice: asset.price,
-    });
+    const quote = (asset: MarketAsset) => {
+      const price = prices.get(asset.symbol) ?? asset.price;
+      return {
+        ...asset,
+        price,
+        referencePrice: asset.price > 0 ? asset.price : price,
+      };
+    };
     if (!symbol) return MARKET_ASSETS.map(quote);
-    const asset = findMarketAsset(symbol);
-    if (!asset) throw new NotFoundException('Actif introuvable.');
+    const asset = resolveMarketAsset(symbol);
+    if (!prices.has(asset.symbol) && !(asset.price > 0)) {
+      throw new NotFoundException(
+        `Aucune donnée de prix disponible pour ${asset.symbol}.`,
+      );
+    }
     return quote(asset);
   }
 
@@ -280,7 +297,9 @@ export class TradingService {
   private positionView(position: TradingPosition, prices: Map<string, number>) {
     const quantity = Number(position.quantity);
     const averagePrice = Number(position.averagePrice);
-    const currentPrice = prices.get(position.symbol) ?? 0;
+    // Si aucun mark n'existe encore pour un actif découvert, on valorise au
+    // prix d'achat moyen plutôt que d'afficher un prix de 0 (jamais crédible).
+    const currentPrice = prices.get(position.symbol) ?? averagePrice;
     const marketValue = this.money(quantity * currentPrice);
     return {
       symbol: position.symbol,

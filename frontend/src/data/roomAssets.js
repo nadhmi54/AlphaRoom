@@ -10,8 +10,29 @@ export const ROOM_ASSETS = [
   { symbol: 'AAPL', name: 'Apple', unit: 'action', unitShort: 'act.', category: 'Actions', price: 224.5, decimals: 2, qtyDecimals: 2 },
 ];
 
+// Métadonnées neutres d'un actif inconnu : surtout **aucun prix inventé**
+// (0), pour qu'il ne puisse jamais être affiché ou utilisé comme une cotation.
+const UNKNOWN_ROOM_ASSET = {
+  symbol: '',
+  name: 'Actif inconnu',
+  unit: 'unité',
+  unitShort: 'u.',
+  category: 'Autre',
+  price: 0,
+  decimals: 2,
+  qtyDecimals: 6,
+  known: false,
+};
+
 export function findRoomAsset(symbol) {
-  return ROOM_ASSETS.find((asset) => asset.symbol === symbol) || ROOM_ASSETS[0];
+  const asset = ROOM_ASSETS.find((item) => item.symbol === symbol);
+  return asset ?? { ...UNKNOWN_ROOM_ASSET, symbol: symbol ?? '' };
+}
+
+/** Vrai seulement si l'actif est connu ET dispose d'un prix utilisable. */
+export function hasUsablePrice(symbol) {
+  const asset = ROOM_ASSETS.find((item) => item.symbol === symbol);
+  return Boolean(asset && Number(asset.price) > 0);
 }
 
 export function assetUnit(symbol) {
@@ -33,7 +54,9 @@ export function assetQtyDecimals(symbol) {
 /** Prix formaté avec le nombre de décimales propre à l'actif. */
 export function formatPrice(value, symbol) {
   const num = Number(value);
-  if (!Number.isFinite(num)) return '—';
+  // Un prix nul ou négatif n'est pas une cotation : on affiche un tiret plutôt
+  // qu'un « 0,00 » trompeur.
+  if (!Number.isFinite(num) || num <= 0) return '—';
   return num.toLocaleString('fr-FR', {
     minimumFractionDigits: assetDecimals(symbol),
     maximumFractionDigits: assetDecimals(symbol),

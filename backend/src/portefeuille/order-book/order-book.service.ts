@@ -6,7 +6,11 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { DataSource, In, IsNull, type EntityManager } from 'typeorm';
-import { findMarketAsset } from '../trading/market-assets.js';
+import { BinanceRestService } from '../market-data/binance-rest.service.js';
+import {
+  resolveMarketAsset,
+  toBinanceSymbol,
+} from '../trading/market-assets.js';
 import { TradingService } from '../trading/trading.service.js';
 import { TradingPortfolio } from '../trading/portfolio.entity.js';
 import { TradingPosition } from '../trading/position.entity.js';
@@ -43,13 +47,23 @@ const MIN_NOTIONAL = 0.01;
 
 const ADVISORY_NAMESPACE = 'alpharoom.order_book';
 
+/** Durée de validité d'un prix Binance gardé en mémoire (ms). */
+const REFERENCE_TTL_MS = 15_000;
+
 @Injectable()
 export class OrderBookService {
   private readonly logger = new Logger(OrderBookService.name);
 
+  /**
+   * Prix Binance récents, pour éviter un appel REST à chaque lecture du carnet
+   * (l'interface interroge `/orders/book` toutes les 2 secondes).
+   */
+  private readonly referenceCache = new Map<string, { price: number; at: number }>();
+
   constructor(
     private readonly dataSource: DataSource,
     private readonly trading: TradingService,
+    private readonly binance: BinanceRestService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -62,26 +76,27 @@ export class OrderBookService {
    */
   async getBook(symbol: string, depth = 12) {
     const asset = this.asset(symbol);
+    const canonical = asset.symbol;
 
     return this.dataSource.transaction(async (manager) => {
       // Le verrou couvre aussi la réalimentation du carnet : deux lectures
       // simultanées ne peuvent pas insérer deux fois les mêmes niveaux.
-      await this.lockSymbol(manager, symbol);
-      await this.ensureLiquidity(manager, symbol);
+      await this.lockSymbol(manager, canonical);
+      const reference = await this.ensureLiquidity(manager, canonical);
 
-      const orders = await this.openOrders(manager, symbol);
+      const orders = await this.openOrders(manager, canonical);
       const resting = this.toResting(orders);
       const bids = aggregateLevels(resting, 'buy', depth);
       const asks = aggregateLevels(resting, 'sell', depth);
       const { bestBid, bestAsk, spread } = computeSpread(bids, asks);
-      const mark = await this.mark(manager, symbol);
+      const mark = await this.mark(manager, canonical);
 
       return {
-        symbol,
+        symbol: canonical,
         name: asset.name,
         unit: asset.unit,
-        referencePrice: asset.price,
-        lastPrice: mark ? Number(mark.lastPrice) : asset.price,
+        referencePrice: asset.price > 0 ? asset.price : reference,
+        lastPrice: mark ? Number(mark.lastPrice) : reference,
         lastTradeAt: mark?.lastTradeAt ?? null,
         bestBid,
         bestAsk,
@@ -121,7 +136,11 @@ export class OrderBookService {
     let quantity = roundQuantity(Number(dto.quantity));
     const limitPrice =
       dto.type === 'limit' ? roundPrice(Number(dto.limitPrice)) : null;
+    const symbol = resolveMarketAsset(dto.symbol).symbol;
 
+    if (!symbol) {
+      throw new BadRequestException('Actif invalide : précisez un symbole.');
+    }
     if (!options.closePosition && quantity <= 0) {
       throw new BadRequestException('La quantité doit être strictement positive.');
     }
@@ -130,7 +149,7 @@ export class OrderBookService {
     }
 
     return this.dataSource.transaction(async (manager) => {
-      await this.lockSymbol(manager, dto.symbol);
+      await this.lockSymbol(manager, symbol);
 
       // Idempotence : un renvoi du même requestId (retry réseau) renvoie
       // l'ordre déjà enregistré au lieu de le rejouer.
@@ -140,27 +159,27 @@ export class OrderBookService {
       if (existing) return { ...this.orderResult(existing), duplicate: true };
 
       if (options.cancelPending) {
-        await this.cancelPending(manager, ownerId, dto.symbol);
+        await this.cancelPending(manager, ownerId, symbol);
       }
 
       // Sans liquidité de départ, un premier utilisateur ne pourrait jamais
       // traiter : le carnet se réalimente avant l'appariement.
-      await this.ensureLiquidity(manager, dto.symbol);
+      await this.ensureLiquidity(manager, symbol);
       const portfolio = await this.trading.lockPortfolio(manager, ownerId);
 
       if (options.closePosition) {
         const position = await manager.getRepository(TradingPosition).findOne({
-          where: { portfolioId: portfolio.id, symbol: dto.symbol },
+          where: { portfolioId: portfolio.id, symbol },
         });
         quantity = roundQuantity(Number(position?.quantity ?? 0));
         if (quantity <= 0) throw new BadRequestException('Aucune position ouverte à fermer.');
       }
 
       if (dto.side === 'sell') {
-        await this.assertAvailableQuantity(manager, ownerId, portfolio, dto.symbol, quantity);
+        await this.assertAvailableQuantity(manager, ownerId, portfolio, symbol, quantity);
       }
 
-      const makerOrders = await this.openOrders(manager, dto.symbol);
+      const makerOrders = await this.openOrders(manager, symbol);
       let plan: MatchPlan;
       try {
         plan = matchOrder(
@@ -174,14 +193,15 @@ export class OrderBookService {
         throw error;
       }
 
-      await this.assertFunding(manager, ownerId, portfolio, dto, quantity, limitPrice, plan);
+      const orderDto = { ...dto, symbol };
+      await this.assertFunding(manager, ownerId, portfolio, orderDto, quantity, limitPrice, plan);
 
-      const order = await this.createOrder(manager, ownerId, dto, quantity, limitPrice);
+      const order = await this.createOrder(manager, ownerId, orderDto, quantity, limitPrice);
       const makers = new Map(makerOrders.map((maker) => [maker.id, maker]));
       await this.applyFills(manager, order, plan, makers);
       await this.settleOrder(manager, order, plan, dto.type);
       if (plan.fills.length > 0) {
-        await this.recordMark(manager, dto.symbol, plan.fills.at(-1)!.price);
+        await this.recordMark(manager, symbol, plan.fills.at(-1)!.price);
       }
 
       return this.orderResult(order, plan);
@@ -220,10 +240,11 @@ export class OrderBookService {
   }
 
   async closePosition(ownerId: string, symbol: string, requestId: string) {
+    const canonical = resolveMarketAsset(symbol).symbol;
     const portfolio = await this.dataSource.getRepository(TradingPortfolio).findOne({ where: { ownerId } });
     if (!portfolio) throw new NotFoundException('Portefeuille introuvable.');
     const initial = await this.dataSource.getRepository(TradingPosition).findOne({
-      where: { portfolioId: portfolio.id, symbol },
+      where: { portfolioId: portfolio.id, symbol: canonical },
     });
     if (Number(initial?.quantity ?? 0) <= 0) {
       throw new BadRequestException('Aucune position ouverte à fermer.');
@@ -234,7 +255,7 @@ export class OrderBookService {
       const result = await this.placeOrder(
         ownerId,
         {
-          symbol,
+          symbol: canonical,
           side: 'sell',
           type: 'market',
           quantity: 0.000001,
@@ -248,11 +269,11 @@ export class OrderBookService {
       orders.push(result);
 
       const current = await this.dataSource.getRepository(TradingPosition).findOne({
-        where: { portfolioId: portfolio.id, symbol },
+        where: { portfolioId: portfolio.id, symbol: canonical },
       });
       if (Number(current?.quantity ?? 0) <= 0) {
         return {
-          symbol,
+          symbol: canonical,
           status: 'closed',
           filledQuantity: orders.reduce((sum, order) => sum + order.filledQuantity, 0),
           orders: orders.map((order) => order.order),
@@ -596,28 +617,80 @@ export class OrderBookService {
   }
 
   /**
+   * Prix de référence réel d'un actif, dans cet ordre :
+   *   1. dernier prix exécuté / dernier mark du moteur (`order_book_marks`) ;
+   *   2. prix de démonstration des actifs natifs (XAU/USD, EUR/USD, BTC/USD, AAPL) ;
+   *   3. ticker Binance REST pour une paire découverte (cache 15 s) ;
+   *   4. dernière exécution enregistrée dans `trade_executions`.
+   *
+   * Si aucun prix réel n'existe, on lève une erreur française explicite :
+   * jamais de retour silencieux qui laisserait un carnet vide et ferait échouer
+   * un achat avec « aucune contrepartie ».
+   */
+  private async referencePrice(manager: EntityManager, symbol: string): Promise<number> {
+    const mark = await this.mark(manager, symbol);
+    const marked = Number(mark?.lastPrice ?? 0);
+    if (marked > 0) return marked;
+
+    const asset = resolveMarketAsset(symbol);
+    if (asset.price > 0) return asset.price;
+
+    const binanceSymbol = toBinanceSymbol(symbol);
+    if (binanceSymbol) {
+      const cached = this.referenceCache.get(binanceSymbol);
+      if (cached && Date.now() - cached.at < REFERENCE_TTL_MS) return cached.price;
+      const live = await this.binance.getPrice(binanceSymbol);
+      if (live !== null && live > 0) {
+        this.referenceCache.set(binanceSymbol, { price: live, at: Date.now() });
+        return live;
+      }
+    }
+
+    const rows = (await manager.query(
+      `select price from public.trade_executions
+        where symbol = $1
+        order by executed_at desc
+        limit 1`,
+      [symbol],
+    )) as Array<{ price: string }>;
+    const executed = Number(rows[0]?.price ?? 0);
+    if (executed > 0) return executed;
+
+    throw new BadRequestException(
+      `Aucune donnée de prix disponible pour ${symbol}. Impossible d'afficher ou de négocier cet actif pour le moment.`,
+    );
+  }
+
+  /**
    * Maintient une liquidité de marché simulée autour du dernier prix connu.
    * `owner_id = null` : ces ordres n'ont pas de contrepartie comptable, ils
    * représentent le « reste du marché ». Sans eux, un compte seul ne pourrait
    * jamais traiter et le carnet serait vide à l'ouverture de la page.
    *
    * La grille est reconstruite dès qu'elle ne correspond plus aux prix attendus
-   * autour du dernier prix exécuté : elle reste ainsi serrée (4 niveaux de
-   * chaque côté) au lieu d'accumuler des niveaux obsolètes quand le cours
-   * dérive. Une consommation partielle d'un niveau est conservée, elle montre
-   * justement que les ordres au marché consomment le carnet.
+   * autour du dernier prix connu : elle reste ainsi serrée (4 niveaux de chaque
+   * côté) au lieu d'accumuler des niveaux obsolètes quand le cours dérive.
+   *
+   * Les ordres système qui ne font plus partie de la grille sont **annulés**
+   * (jamais supprimés) : un ordre partiellement exécuté reste référencé par
+   * `trade_executions`, et le supprimer casserait la comptabilité. Les niveaux
+   * inchangés sont conservés ; les nouveaux sont insérés en une seule requête.
    */
-  private async ensureLiquidity(manager: EntityManager, symbol: string) {
-    const asset = this.asset(symbol);
-    const repo = manager.getRepository(Order);
-    const systemOrders = await repo.find({
-      where: { symbol, ownerId: IsNull(), status: In(OPEN_STATUSES) },
-    });
-    const mark = await this.mark(manager, symbol);
-    const reference = mark ? Number(mark.lastPrice) : asset.price;
+  private async ensureLiquidity(manager: EntityManager, symbol: string): Promise<number> {
+    const reference = await this.referencePrice(manager, symbol);
+    if (!(reference > 0)) {
+      throw new BadRequestException(
+        `Aucune donnée de prix disponible pour ${symbol}. Impossible d'afficher le carnet pour cet actif.`,
+      );
+    }
+
     const step = Math.max(roundPrice(reference * (SYSTEM_HALF_SPREAD_BP / 10000)), 0.0001);
     const size = roundQuantity(SYSTEM_LEVEL_NOTIONAL / reference);
-    if (size <= 0) return;
+    if (!(size > 0)) {
+      throw new BadRequestException(
+        `Aucune donnée de prix disponible pour ${symbol}. Impossible d'afficher le carnet pour cet actif.`,
+      );
+    }
 
     const expected: Array<{ side: 'buy' | 'sell'; price: number }> = [];
     for (let level = 1; level <= SYSTEM_DEPTH; level += 1) {
@@ -627,33 +700,53 @@ export class OrderBookService {
       if (ask > 0) expected.push({ side: 'sell', price: ask });
     }
 
-    const upToDate =
-      systemOrders.length === expected.length &&
-      expected.every((slot) =>
-        systemOrders.some(
-          (order) => order.side === slot.side && Number(order.limitPrice) === slot.price,
-        ),
-      );
-    if (upToDate) return;
+    const repo = manager.getRepository(Order);
+    const systemOrders = await repo.find({
+      where: { symbol, ownerId: IsNull(), status: In(OPEN_STATUSES) },
+    });
 
-    await repo.delete({ symbol, ownerId: IsNull() });
+    // Conserve l'ordre déjà présent à chaque prix attendu (même partiellement
+    // exécuté) et ne recrée que les niveaux manquants.
+    const kept = new Set<string>();
+    const missing: typeof expected = [];
     for (const slot of expected) {
-      await repo.save(
-        repo.create({
+      const existing = systemOrders.find(
+        (order) =>
+          !kept.has(order.id) &&
+          order.side === slot.side &&
+          Number(order.limitPrice) === slot.price,
+      );
+      if (existing) kept.add(existing.id);
+      else missing.push(slot);
+    }
+
+    const stale = systemOrders.filter((order) => !kept.has(order.id));
+    if (stale.length > 0) {
+      await repo.update(
+        { id: In(stale.map((order) => order.id)) },
+        { status: 'cancelled', closedAt: new Date(), updatedAt: new Date() },
+      );
+    }
+
+    if (missing.length > 0) {
+      await repo.insert(
+        missing.map((slot) => ({
           ownerId: null,
           symbol,
           side: slot.side,
-          type: 'limit',
-          status: 'open',
+          type: 'limit' as const,
+          status: 'open' as const,
           quantity: size.toFixed(6),
           filledQuantity: '0.000000',
           remainingQuantity: size.toFixed(6),
           limitPrice: slot.price.toFixed(4),
           filledAmount: '0.00',
           requestId: null,
-        }),
+        })),
       );
     }
+
+    return reference;
   }
 
   // ---------------------------------------------------------------------------
@@ -672,10 +765,12 @@ export class OrderBookService {
     ]);
   }
 
+  /**
+   * Métadonnées d'un actif. Ne lève jamais d'exception : un symbole inconnu
+   * obtient des métadonnées neutres et `price: 0` (voir `resolveMarketAsset`).
+   */
   private asset(symbol: string) {
-    const asset = findMarketAsset(symbol);
-    if (!asset) throw new BadRequestException('Actif non disponible dans la simulation.');
-    return asset;
+    return resolveMarketAsset(symbol);
   }
 
   private orderResult(order: Order, plan?: MatchPlan) {

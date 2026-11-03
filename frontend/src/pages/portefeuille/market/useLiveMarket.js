@@ -126,6 +126,8 @@ export default function useLiveMarket(symbol, range) {
       return undefined;
     }
     let cancelled = false;
+    // Évite d'afficher brièvement la cotation du symbole précédent.
+    setCustomQuote(null);
 
     const pollCustom = async () => {
       if (cancelled) return;
@@ -139,7 +141,7 @@ export default function useLiveMarket(symbol, range) {
           symbol:        symbol,
           name:          spot.name ?? symbol,
           displaySymbol: spot.displaySymbol ?? symbol,
-          unit:          "unité",
+          unit:          spot.displaySymbol?.split("/")[0] ?? "unité",
           category:      "crypto",
           price:         spot.price,
           source:        "live",
@@ -161,8 +163,8 @@ export default function useLiveMarket(symbol, range) {
           while (s < grown.length - 2 && grown[s].t < oldest) s++;
           return s ? grown.slice(s) : grown;
         });
-      } catch {
-        // silencieux
+      } catch (err) {
+        if (!cancelled) setError(describeError(err));
       }
     };
 
