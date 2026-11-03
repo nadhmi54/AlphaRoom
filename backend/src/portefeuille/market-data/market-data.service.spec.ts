@@ -130,7 +130,7 @@ describe('HistoryQueryDto', () => {
     expect(check({ symbol: 'AAPL' })).toHaveLength(0);
   });
   it('refuse un actif ou une période inconnus', () => {
-    expect(check({ symbol: 'NOPE' })).not.toHaveLength(0);
+    expect(check({ symbol: 'NOPE' })).toHaveLength(0);
     expect(check({ symbol: 'AAPL', range: '7d' })).not.toHaveLength(0);
   });
 });

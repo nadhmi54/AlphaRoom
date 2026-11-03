@@ -1,7 +1,4 @@
-import { IsIn, IsNumber, IsString, IsUUID, Max, Min, ValidateIf } from 'class-validator';
-import { MARKET_ASSETS } from '../../trading/market-assets.js';
-
-const SYMBOLS = MARKET_ASSETS.map((asset) => asset.symbol);
+import { IsIn, IsNumber, IsString, IsUUID, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 
 /**
  * Ordre envoyé au carnet.
@@ -12,7 +9,7 @@ const SYMBOLS = MARKET_ASSETS.map((asset) => asset.symbol);
  */
 export class PlaceBookOrderDto {
   @IsString()
-  @IsIn(SYMBOLS)
+  @MaxLength(20)
   symbol!: string;
 
   @IsString()

@@ -1,0 +1,47 @@
+﻿
+Filename                         LineNumber Line                                                                       
+--------                         ---------- ----                                                                       
+ai-analysis.dto.ts                        7   @Type(() => Number) @IsInt() @Min(1) @Max(99) run!: number;              
+ai-analysis.dto.ts                       13   @Type(() => Number) @IsInt() @Min(1) @Max(99) fromRun!: number;          
+ai-analysis.dto.ts                       15   @Type(() => Number) @IsInt() @Min(1) @Max(99) toRun!: number;            
+ai-coach.dto.ts                          18   @IsIn(['user', 'assistant']) role!: 'user' | 'assistant';                
+ai-coach.dto.ts                          30   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(99) run?: number;
+ai-report.dto.ts                         21   @Type(() => Number) @IsInt() @Min(1) @Max(99) run!: number;              
+ai-report.dto.ts                         30   @Type(() => Number) @IsInt() @Min(1) @Max(99) run!: number;              
+ai-report.dto.ts                         57   @IsOptional() @IsInt() @Min(0) @Max(10) teacherScore?: number | null;    
+game-room.dto.ts                         40   @IsIn(ROOM_ASSET_CHOICES, { each: true })                                
+game-room.dto.ts                         44   @IsInt()                                                                 
+game-room.dto.ts                         56   @IsIn(['USD', 'EUR'])                                                    
+game-room.dto.ts                        100   @IsIn(SOURCE_MODES as unknown as string[])                               
+game-room.dto.ts                        128   @IsInt()                                                                 
+game-room.dto.ts                        141   @IsIn(HISTORY_RANGE_CHOICES as unknown as string[])                      
+game-room.dto.ts                        208   @IsInt()                                                                 
+game-room.dto.ts                        214   @IsIn(TIMEFRAME_CHOICES as unknown as string[])                          
+game-room.dto.ts                        305   @IsIn(['buy', 'sell'])                                                   
+game-room.dto.ts                        309   @IsIn(['market', 'limit'])                                               
+game-room.dto.ts                        354   @IsIn(['start', 'pause', 'resume', 'reset', 'finish'])                   
+game-room.dto.ts                        368   @IsInt()                                                                 
+market-transactions.service.ts           65   // `sort` et `order` sont validés par le DTO (@IsIn) : la colonne est    
+transactions-query.dto.ts                11   @IsIn(['buy', 'sell'])                                                   
+transactions-query.dto.ts                36   @IsInt()                                                                 
+transactions-query.dto.ts                42   @IsInt()                                                                 
+transactions-query.dto.ts                48   @IsIn(['executedAt', 'amount', 'quantity', 'price'])                     
+transactions-query.dto.ts                52   @IsIn(['ASC', 'DESC'])                                                   
+history-query.dto.ts                     11   @IsIn(Object.keys(HISTORY_RANGES))                                       
+book-query.dto.ts                        11   @IsInt()                                                                 
+orders-query.dto.ts                       6   @IsIn(['open', 'partially_filled', 'filled', 'cancelled'])               
+place-book-order.dto.ts                  16   @IsIn(['buy', 'sell'])                                                   
+place-book-order.dto.ts                  20   @IsIn(['market', 'limit'])                                               
+performance-history-query.dto.ts          8   @IsInt()                                                                 
+performance-history-query.dto.ts         14   @IsInt()                                                                 
+positions-query.dto.ts                    9   @IsIn(POSITION_STATUSES)                                                 
+place-order.dto.ts                        9   @IsIn(['buy', 'sell'])                                                   
+portfolio-history-query.dto.ts           11   @IsIn(['buy', 'sell'])                                                   
+portfolio-history-query.dto.ts           24   @IsInt()                                                                 
+portfolio-history-query.dto.ts           30   @IsInt()                                                                 
+admin.dto.ts                              8   @IsInt()                                                                 
+admin.dto.ts                             14   @IsInt()                                                                 
+update-profile.dto.ts                    21   @IsIn(['fr', 'en'], { message: 'Langue non supportée (fr ou en).' })     
+update-profile.dto.ts                    25   @IsIn(['dark', 'light'], { message: 'Thème non supporté (dark ou light...
+
+

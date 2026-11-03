@@ -1,13 +1,10 @@
 import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
-import { FEED_SPECS, HISTORY_RANGES, type HistoryRange } from '../market-feed-config.js';
-
-const VALID_SYMBOLS = FEED_SPECS.map((s) => s.symbol);
+import { HISTORY_RANGES, type HistoryRange } from '../market-feed-config.js';
 
 export class HistoryQueryDto {
-  /** Symbole interne (XAU/USD, BTC/USD…). */
+  /** Symbole de l'actif à historiser (n'importe quel symbole accepté). */
   @IsString()
   @MaxLength(20)
-  @IsIn(VALID_SYMBOLS)
   symbol!: string;
 
   @IsOptional()

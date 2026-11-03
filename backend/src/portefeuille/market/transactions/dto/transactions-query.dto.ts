@@ -1,9 +1,10 @@
 import { Type } from 'class-transformer';
-import { IsDateString, IsIn, IsInt, IsNumber, IsOptional, Max, Min } from 'class-validator';
+import { IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class TransactionsQueryDto {
   @IsOptional()
-  @IsIn(['XAU/USD', 'EUR/USD', 'BTC/USD', 'AAPL'])
+  @IsString()
+  @MaxLength(20)
   symbol?: string;
 
   @IsOptional()

@@ -1,8 +1,8 @@
-import { IsIn, IsNumber, IsString, IsUUID, Max, Min } from 'class-validator';
+import { IsIn, IsNumber, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 
 export class PlaceOrderDto {
   @IsString()
-  @IsIn(['XAU/USD', 'EUR/USD', 'BTC/USD', 'AAPL'])
+  @MaxLength(20)
   symbol!: string;
 
   @IsString()

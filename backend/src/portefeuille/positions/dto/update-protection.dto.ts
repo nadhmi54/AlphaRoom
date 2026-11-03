@@ -1,9 +1,8 @@
-import { IsIn, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
-import { MARKET_ASSETS } from '../../trading/market-assets.js';
+import { IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class UpdateProtectionDto {
   @IsString()
-  @IsIn(MARKET_ASSETS.map((asset) => asset.symbol))
+  @MaxLength(20)
   symbol!: string;
 
   @IsOptional()

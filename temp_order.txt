@@ -1,0 +1,120 @@
+﻿import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { DataSource, In, IsNull, type EntityManager } from 'typeorm';
+import { findMarketAsset } from '../trading/market-assets.js';
+import { TradingService } from '../trading/trading.service.js';
+import { TradingPortfolio } from '../trading/portfolio.entity.js';
+import { TradingPosition } from '../trading/position.entity.js';
+import { getProtectionTrigger } from '../positions/protection-trigger.js';
+import { OrderBookMark } from './order-book-mark.entity.js';
+import { Order, type OrderStatus } from './order.entity.js';
+import type { PlaceBookOrderDto } from './dto/place-book-order.dto.js';
+import {
+  aggregateFills,
+  aggregateLevels,
+  computeSpread,
+  matchOrder,
+  roundAmount,
+  roundPrice,
+  roundQuantity,
+  type MatchPlan,
+  type RestingOrder,
+} from './matching.js';
+
+/** Statuts dont le reliquat peut encore s'exécuter. */
+const OPEN_STATUSES: OrderStatus[] = ['open', 'partially_filled'];
+
+/** Nombre de niveaux de liquidité système maintenus de chaque côté. */
+const SYSTEM_DEPTH = 4;
+
+/** Notional visé par niveau système, en USD. */
+const SYSTEM_LEVEL_NOTIONAL = 20000;
+
+/** Demi-spread de la liquidité système, en points de base (0,05 %). */
+const SYSTEM_HALF_SPREAD_BP = 5;
+
+/** Montant minimum d'une exécution, aligné sur la précision du centime. */
+const MIN_NOTIONAL = 0.01;
+
+const ADVISORY_NAMESPACE = 'alpharoom.order_book';
+
+@Injectable()
+export class OrderBookService {
+  private readonly logger = new Logger(OrderBookService.name);
+
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly trading: TradingService,
+  ) {}
+
+  // ---------------------------------------------------------------------------
+  // Lecture du carnet
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Photo du carnet pour un actif : bids du plus haut au plus bas, asks du plus
+   * bas au plus haut, spread au milieu. Sert l'affichage temps réel (M1).
+   */
+  async getBook(symbol: string, depth = 12) {
+    const asset = this.asset(symbol);
+
+    return this.dataSource.transaction(async (manager) => {
+      // Le verrou couvre aussi la réalimentation du carnet : deux lectures
+      // simultanées ne peuvent pas insérer deux fois les mêmes niveaux.
+      await this.lockSymbol(manager, symbol);
+      await this.ensureLiquidity(manager, symbol);
+
+      const orders = await this.openOrders(manager, symbol);
+      const resting = this.toResting(orders);
+      const bids = aggregateLevels(resting, 'buy', depth);
+      const asks = aggregateLevels(resting, 'sell', depth);
+      const { bestBid, bestAsk, spread } = computeSpread(bids, asks);
+      const mark = await this.mark(manager, symbol);
+
+      return {
+        symbol,
+        name: asset.name,
+        unit: asset.unit,
+        referencePrice: asset.price,
+        lastPrice: mark ? Number(mark.lastPrice) : asset.price,
+        lastTradeAt: mark?.lastTradeAt ?? null,
+        bestBid,
+        bestAsk,
+        spread,
+        bids,
+        asks,
+        updatedAt: new Date(),
+      };
+    });
+  }
+
+  /** Ordres de l'utilisateur, les plus récents d'abord. */
+  async listOrders(ownerId: string, status?: OrderStatus) {
+    const orders = await this.dataSource.getRepository(Order).find({
+      where: status ? { ownerId, status } : { ownerId },
+      order: { createdAt: 'DESC' },
+      take: 50,
+    });
+    return orders.map((order) => this.orderView(order));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Écriture : passage et annulation d'ordres
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Point d'entrée unique d'un ordre. Toute la séquence (verrou du carnet,
+   * idempotence, appariement, comptabilisation, mise à jour du carnet) se fait
+   * dans **une seule transaction** : soit l'ordre est entièrement traité, soit
+   * rien ne bouge.
+   */
+  async placeOrder(
+    ownerId: string,
+    dto: PlaceBookOrderDto,
+    options: { cancelPending?: boolean; closePosition?: boolean } = {},
+  ) {
