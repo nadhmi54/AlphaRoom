@@ -678,12 +678,6 @@ export class OrderBookService {
    */
   private async ensureLiquidity(manager: EntityManager, symbol: string): Promise<number> {
     const reference = await this.referencePrice(manager, symbol);
-    if (!(reference > 0)) {
-      throw new BadRequestException(
-        `Aucune donnée de prix disponible pour ${symbol}. Impossible d'afficher le carnet pour cet actif.`,
-      );
-    }
-
     const step = Math.max(roundPrice(reference * (SYSTEM_HALF_SPREAD_BP / 10000)), 0.0001);
     const size = roundQuantity(SYSTEM_LEVEL_NOTIONAL / reference);
     if (!(size > 0)) {

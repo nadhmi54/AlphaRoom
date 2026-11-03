@@ -97,14 +97,6 @@ function remember(asset: MarketAsset) {
 // Les 4 actifs natifs sont toujours connus.
 for (const asset of MARKET_ASSETS) remember(asset);
 
-/**
- * Enregistre des actifs découverts (par exemple une paire Binance choisie dans
- * la recherche). Idempotent : un même symbole est remplacé, pas dupliqué.
- */
-export function registerMarketAssets(assets: readonly MarketAsset[]): void {
-  for (const asset of assets) remember(asset);
-}
-
 /** Tous les actifs actuellement négociables (natifs + actifs découverts). */
 export function tradableAssets(): readonly MarketAsset[] {
   return TRADABLE_ASSETS;
@@ -162,8 +154,5 @@ export function resolveMarketAsset(symbol: string): MarketAsset {
 
 /** Symbole Binance brut (`BNB/USDT` → `BNBUSDT`). */
 export function toBinanceSymbol(symbol: string): string {
-  return normalizeSymbol(symbol).replace(/[^A-Z0-9]/g, '');
+  return symbolKey(symbol);
 }
-
-// ── Export par défaut pour la compatibilité ─────────────────────────────────────
-export default MARKET_ASSETS;
