@@ -590,3 +590,29 @@
   color: #818b9e;
   font-size: 13px;
 }
+
+
+.lm-intervals {
+  display: inline-flex;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 8px;
+}
+.lm-intervals button {
+  background: none;
+  border: none;
+  color: #818b9e;
+  font: 600 11px "JetBrains Mono", monospace;
+  padding: 3px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.lm-intervals button.is-active,
+.lm-intervals button:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}

@@ -1,22 +1,20 @@
 import { useMemo, useState } from "react";
+import CandlestickChart from "../../../components/CandlestickChart/CandlestickChart.jsx";
+import { INTERVALS, aggregateToCandles } from "../../../utils/candlestick.js";
 import { formatClock, formatPercent, formatPrice } from "./format.js";
 
 const WIDTH = 1000;
 const HEIGHT = 320;
 const PAD_Y = 0.12;
 
+const MARKET_INTERVALS = ["1s", "5s", "15s", "1m", "5m"];
+
 /**
- * Graphique d'une série de prix. Tracé en SVG (la courbe) ; textes, point
- * clignotant, lignes de repère et info-bulle en HTML pour ne jamais être
- * déformés.
- *
- * `lines` : repères horizontaux { price, label, tone }. Un repère hors de la
- * zone visible est collé au bord avec une flèche, pour ne pas écraser la
- * courbe ; avec `fitLines` il agrandit au contraire la zone (courbe du
- * capital, où la ligne de départ est la référence).
+ * Graphique de marché en chandeliers japonais (candlesticks),
+ * avec repli en courbe continue (fitLines) pour les graphiques de capital ou de performance.
  */
 export default function LiveChart({
-  points,
+  points = [],
   showSeconds = true,
   lines = [],
   fitLines = false,
@@ -24,18 +22,34 @@ export default function LiveChart({
   emptyText = "Collecte des premiers prix…",
 }) {
   const [hover, setHover] = useState(null);
+  const [intervalKey, setIntervalKey] = useState("5s");
   const timeLabel = formatTime ?? ((t) => formatClock(t, showSeconds));
 
+  const intervalSeconds = INTERVALS[intervalKey]?.seconds ?? 5;
+
+  // ── Mode Chandeliers Japonais (Marché en direct /marche) ────────────────────
+  const candles = useMemo(() => {
+    if (fitLines || !points || points.length === 0) return [];
+    return aggregateToCandles(points, intervalSeconds);
+  }, [points, intervalSeconds, fitLines]);
+
+  const priceLines = useMemo(() => {
+    return lines.map((l) => ({
+      price: l.price,
+      label: l.label,
+      color: l.color || "#d9b877",
+    }));
+  }, [lines]);
+
+  // ── Mode Courbe de Capital (fitLines = true pour Cockpit / Performance) ──────
   const geometry = useMemo(() => {
-    if (points.length < 2) return null;
+    if (!fitLines || points.length < 2) return null;
     const prices = points.map((p) => p.price);
     let min = Math.min(...prices);
     let max = Math.max(...prices);
-    if (fitLines) {
-      for (const line of lines) {
-        min = Math.min(min, line.price);
-        max = Math.max(max, line.price);
-      }
+    for (const line of lines) {
+      min = Math.min(min, line.price);
+      max = Math.max(max, line.price);
     }
     const pad = (max - min || max * 0.0005) * PAD_Y;
     const low = min - pad;
@@ -48,8 +62,59 @@ export default function LiveChart({
     return { xs, ys, path, low, high };
   }, [points, lines, fitLines]);
 
+  if (!points || points.length < 2) {
+    return <div className="lm-chart lm-chart--empty" data-testid="live-chart">{emptyText}</div>;
+  }
+
+  // Si on est en mode marché (chandeliers japonais)
+  if (!fitLines) {
+    const isUp = candles.length > 0
+      ? candles[candles.length - 1].close >= candles[0].open
+      : true;
+
+    return (
+      <div className={`lm-chart ${isUp ? "is-up" : "is-down"}`}>
+        {/* Sélecteur d'intervalle pour chandeliers */}
+        <div className="lm-intervals" role="group" aria-label="Intervalle de bougie">
+          {MARKET_INTERVALS.map((key) => (
+            <button
+              key={key}
+              type="button"
+              className={intervalKey === key ? "is-active" : ""}
+              aria-pressed={intervalKey === key}
+              onClick={() => setIntervalKey(key)}
+            >
+              {key}
+            </button>
+          ))}
+        </div>
+
+        <div className="lm-chart-plot" data-testid="live-chart">
+          <CandlestickChart
+            candles={candles}
+            height={HEIGHT}
+            priceLines={priceLines}
+            formatTime={(sec) => timeLabel(sec * 1000)}
+            emptyText={emptyText}
+            testId="live-chart-candles"
+          />
+          {lines.map((line) => (
+            <span
+              key={line.label}
+              className="lm-ref-chip"
+              style={{ position: "absolute", bottom: "10px", left: "10px", top: "auto", zIndex: 2 }}
+            >
+              {line.label}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Mode courbe de capital
   if (!geometry) {
-    return <div className="lm-chart lm-chart--empty">{emptyText}</div>;
+    return <div className="lm-chart lm-chart--empty" data-testid="live-chart">{emptyText}</div>;
   }
 
   const up = points.at(-1).price >= points[0].price;
