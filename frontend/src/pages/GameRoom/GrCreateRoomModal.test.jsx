@@ -35,7 +35,8 @@ describe('GrCreateRoomModal', () => {
       target: { value: 'Séance krach' },
     });
     // Deux actifs négociables + capital personnalisé
-    fireEvent.click(screen.getByRole('button', { name: /BTC\/USD/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Crypto/i }));
+    fireEvent.click(screen.getByRole('button', { name: /BTC\/USD Bitcoin/i }));
     fireEvent.change(screen.getByLabelText(/Capital initial/i), { target: { value: '50000' } });
 
     clickNext();

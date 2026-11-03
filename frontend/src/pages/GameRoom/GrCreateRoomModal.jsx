@@ -2,12 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   DURATION_CHOICES,
   HISTORY_RANGE_CHOICES,
-  ROOM_ASSETS,
   SOURCE_MODES,
   TIMEFRAME_CHOICES,
   findRoomAsset,
 } from '../../data/roomAssets.js';
 import { createGameRoom, previewCsv } from '../../services/gameRoomService.js';
+import GrAssetPicker from './GrAssetPicker.jsx';
 
 const STEPS = [
   { id: 1, label: 'Salle' },
@@ -321,20 +321,10 @@ export default function GrCreateRoomModal({ onClose, onCreated }) {
 
               <div className="gr-field">
                 <span className="gr-field__label">Actifs négociables * ({settings.assets.length} sélectionné{settings.assets.length > 1 ? 's' : ''})</span>
-                <div className="gr-asset-picker">
-                  {ROOM_ASSETS.map((asset) => (
-                    <button
-                      key={asset.symbol}
-                      type="button"
-                      className={`gr-asset-chip ${settings.assets.includes(asset.symbol) ? 'is-active' : ''}`}
-                      onClick={() => toggleAsset(asset.symbol)}
-                      title={`${asset.name} — unité : ${asset.unit}`}
-                    >
-                      <strong>{asset.symbol}</strong>
-                      <small>{asset.name}</small>
-                    </button>
-                  ))}
-                </div>
+                <GrAssetPicker assets={settings.assets} onToggle={toggleAsset} />
+                <small className="gr-wizard__hint">
+                  Choisis un marché puis cherche l’actif : le nombre d’actifs négociables est libre.
+                </small>
               </div>
 
               <div className="gr-field-grid">

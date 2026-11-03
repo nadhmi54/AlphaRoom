@@ -15,11 +15,15 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { MARKET_ASSETS } from '../../portefeuille/trading/market-assets.js';
-import { HISTORY_RANGE_CHOICES } from '../game-room-config.js';
+import { CATALOG_ASSETS, MARKET_ASSETS } from '../../portefeuille/trading/market-assets.js';
+import { HISTORY_RANGE_CHOICES, ROOM_EXTRA_REFERENCE_PRICES } from '../game-room-config.js';
 
-/** Actifs négociables proposés à la création d'une salle. */
-export const ROOM_ASSET_CHOICES = MARKET_ASSETS.map((asset) => asset.symbol);
+/** Actifs négociables proposés à la création d'une salle (les quatre marchés). */
+export const ROOM_ASSET_CHOICES = [
+  ...MARKET_ASSETS.map((asset) => asset.symbol),
+  ...CATALOG_ASSETS.map((asset) => asset.symbol),
+  ...Object.keys(ROOM_EXTRA_REFERENCE_PRICES),
+];
 
 export const SOURCE_MODES = ['scenario', 'synthetic', 'historical', 'csv', 'live'] as const;
 export type SourceModeChoice = (typeof SOURCE_MODES)[number];

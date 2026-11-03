@@ -1,7 +1,20 @@
-import { PANIC_TUESDAY_SCENARIO } from './scenario/panic-tuesday.scenario.js';
+﻿import { PANIC_TUESDAY_SCENARIO } from './scenario/panic-tuesday.scenario.js';
 
 /** Actifs négociables : symboles internes de la plateforme (cf. market-assets.ts). */
 export type RoomAssets = string[];
+
+/**
+ * Paires proposées au Meneur de Jeu mais absentes du catalogue de trading, qui
+ * les découvre à la volée via Binance. Ce prix de référence ne sert qu'au marché
+ * synthétique et au repli hors flux : il évite de coter ces actifs au prix de
+ * l'or du scénario par défaut.
+ */
+export const ROOM_EXTRA_REFERENCE_PRICES: Record<string, number> = {
+  'ETH/USDT': 2600,
+  'SOL/USDT': 175,
+  'BNB/USDT': 590,
+  'XRP/USDT': 0.55,
+};
 
 export type GameRoomTimeframe = '1m' | '5m' | '15m' | '30m' | '1h';
 
@@ -247,6 +260,11 @@ export function syntheticPrice(
 export function naturalSpreadPercent(symbol: string): number {
   if (symbol.startsWith('BTC')) return 0.05;
   if (symbol.startsWith('EUR')) return 0.01;
-  if (symbol === 'AAPL') return 0.03;
-  return 0.012; // XAU/USD et défaut
+  if (symbol.includes('JPY')) return 0.012;
+  if (symbol === 'AAPL' || symbol === 'MSFT' || symbol === 'GOOGL' ||
+      symbol === 'AMZN' || symbol === 'TSLA' || symbol === 'NVDA' || symbol === 'META') return 0.03;
+  if (symbol === 'WTI/USD' || symbol === 'BRENT/USD') return 0.02;
+  if (symbol === 'NATGAS/USD') return 0.04;
+  if (symbol === 'XAG/USD' || symbol === 'COPPER/USD') return 0.025;
+  return 0.012; // XAU/USD et défaut forex/crypto
 }
