@@ -91,10 +91,10 @@ frontend build OK, lint OK, **118 tests OK**.
    passent par `/market/spot`. Aucun faux `live` sur un prix statique.
 3. Optionnel : ajouter un test frontend pour le filtre `TransactionHistory` et
    la sélection `BNB/USDT` ; les tests frontend existants passent.
-4. Nettoyage possible (non demandé) : fichiers de debug du commit WIP
-   (`backend/_allisin.txt`, `backend/_unavailable.txt`, `backend/_symbols4.txt`,
-   `backend/verify.txt`, `temp_order.txt`, `test.txt`, `test2.txt`,
-   `frontend/_symbols4.txt`).
+4. Nettoyage effectué : les 8 fichiers `.txt` de debug du commit WIP ont été
+   supprimés (`backend/_allisin.txt`, `backend/_unavailable.txt`,
+   `backend/_symbols4.txt`, `backend/verify.txt`, `frontend/_symbols4.txt`,
+   `temp_order.txt`, `test.txt`, `test2.txt`) — aucun n'était référencé.
 
 ## Prochaine action exacte
 
