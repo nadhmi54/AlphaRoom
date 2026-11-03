@@ -55,6 +55,16 @@ export class TradingService {
     return prices;
   }
 
+  /** Vue d'un actif avec son prix courant et son prix de référence. */
+  private quoteView(asset: MarketAsset, prices: Map<string, number>) {
+    const price = prices.get(asset.symbol) ?? asset.price;
+    return {
+      ...asset,
+      price,
+      referencePrice: asset.price > 0 ? asset.price : price,
+    };
+  }
+
   async getAssets() {
     const prices = await this.priceMap();
     const assets = new Map<string, MarketAsset>();
@@ -64,14 +74,7 @@ export class TradingService {
     for (const symbol of prices.keys()) {
       if (!assets.has(symbol)) assets.set(symbol, resolveMarketAsset(symbol));
     }
-    return [...assets.values()].map((asset) => {
-      const price = prices.get(asset.symbol) ?? asset.price;
-      return {
-        ...asset,
-        price,
-        referencePrice: asset.price > 0 ? asset.price : price,
-      };
-    });
+    return [...assets.values()].map((asset) => this.quoteView(asset, prices));
   }
 
   async getPortfolio(ownerId: string, filters: PortfolioHistoryQueryDto) {
@@ -262,22 +265,14 @@ export class TradingService {
 
   async getQuote(symbol?: string) {
     const prices = await this.priceMap();
-    const quote = (asset: MarketAsset) => {
-      const price = prices.get(asset.symbol) ?? asset.price;
-      return {
-        ...asset,
-        price,
-        referencePrice: asset.price > 0 ? asset.price : price,
-      };
-    };
-    if (!symbol) return MARKET_ASSETS.map(quote);
+    if (!symbol) return MARKET_ASSETS.map((asset) => this.quoteView(asset, prices));
     const asset = resolveMarketAsset(symbol);
     if (!prices.has(asset.symbol) && !(asset.price > 0)) {
       throw new NotFoundException(
         `Aucune donnée de prix disponible pour ${asset.symbol}.`,
       );
     }
-    return quote(asset);
+    return this.quoteView(asset, prices);
   }
 
   private async getOrCreatePortfolio(ownerId: string) {
