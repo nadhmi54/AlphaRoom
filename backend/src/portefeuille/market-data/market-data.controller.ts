@@ -88,25 +88,30 @@ export class MarketDataController {
 
   /**
    * Prix spot d'un actif.
-   * - Actif du catalogue (MSFT, WTI/USD, GBP/USD…) : prix de démonstration local.
+   * - Actif du moteur de prix (natifs + catalogue, provider any) : prix simulé/live
+   *   du PriceBook, qui bouge à chaque seconde. Jamais le prix de démo figé.
    * - Paire Binance arbitraire (ETHUSDT, BNB/USDT…) : prix réel via l'API REST.
    */
   @Get('spot') async spot(@Query() query: SpotQueryDto) {
-    const asset = findMarketAsset(query.symbol);
-    if (asset && asset.price > 0) {
+    // 1. L'actif est dans le PriceBook (natif ou catalogue) → prix mouvant.
+    const engineQuote = this.market.quoteFor(query.symbol);
+    if (engineQuote && engineQuote.price > 0) {
+      const asset = findMarketAsset(query.symbol);
       return {
-        symbol: asset.symbol,
-        displaySymbol: asset.symbol,
-        name: asset.name,
-        unit: asset.unit,
-        category: asset.category,
-        price: asset.price,
-        source: asset.source,
-        updatedAt: new Date().toISOString(),
+        symbol: engineQuote.symbol,
+        displaySymbol: engineQuote.symbol,
+        name: asset?.name ?? engineQuote.name,
+        unit: asset?.unit ?? engineQuote.unit,
+        category: engineQuote.category,
+        price: engineQuote.price,
+        source: engineQuote.source,
+        updatedAt: engineQuote.updatedAt,
+        changePercent: engineQuote.changePercent,
         found: true,
       };
     }
 
+    // 2. Paire Binance arbitraire → API REST.
     const safe = query.symbol.toUpperCase().replace(/[^A-Z0-9]/g, '');
     const price = await this.binanceRest.getPrice(safe);
     if (price === null) return { symbol: query.symbol, price: null, found: false };

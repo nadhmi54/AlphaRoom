@@ -14,7 +14,34 @@ export interface SocketLike {
 
 export type SocketFactory = (url: string) => SocketLike;
 
-const defaultFactory: SocketFactory = (url) => new WebSocket(url) as unknown as SocketLike;
+/**
+ * WebSocket global : disponible nativement depuis Node 22.
+ * Sur Node 18/20, on utilise la classe WebSocket d'undici (intégrée à Node 18+).
+ * La fabrique peut être remplacée dans les tests par un FakeSocket.
+ */
+function resolveWebSocket(): new (url: string) => SocketLike {
+  // Node 22+ expose WebSocket globalement.
+  if (typeof WebSocket !== 'undefined') return WebSocket as unknown as new (url: string) => SocketLike;
+  try {
+    // undici est intégré à Node 18+ et expose WebSocket depuis sa v5.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { WebSocket: UndiciWS } = require('undici') as { WebSocket: new (url: string) => SocketLike };
+    if (typeof UndiciWS !== 'undefined') return UndiciWS;
+  } catch {
+    // undici absent ou trop ancien : on laisse la fabrique par défaut lever l'erreur.
+  }
+  return class NoWebSocket {
+    constructor(_url: string) {
+      throw new Error('WebSocket indisponible — mettez à jour vers Node 22 ou installez le paquet ws.');
+    }
+    onopen = null; onmessage = null; onclose = null; onerror = null;
+    send() { /* noop */ }
+    close() { /* noop */ }
+  } as unknown as new (url: string) => SocketLike;
+}
+
+const ResolvedWebSocket = resolveWebSocket();
+const defaultFactory: SocketFactory = (url) => new ResolvedWebSocket(url) as unknown as SocketLike;
 
 const MIN_BACKOFF_MS = 1_000;
 const MAX_BACKOFF_MS = 30_000;

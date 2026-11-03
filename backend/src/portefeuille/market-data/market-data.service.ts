@@ -121,6 +121,8 @@ export class MarketDataService implements OnModuleInit, OnModuleDestroy {
           'Crée une clé gratuite sur finnhub.io et ajoute-la dans backend/.env.',
       );
     }
+    // Les actifs provider:'none' (catalogue) n'ont pas de flux : ils restent en
+    // simulation brownienne — aucun feed à créer pour eux.
     return feeds;
   }
 
@@ -244,6 +246,13 @@ export class MarketDataService implements OnModuleInit, OnModuleDestroy {
 
   private async loadInitialPrices(): Promise<Map<string, number>> {
     const prices = new Map(MARKET_ASSETS.map((asset) => [asset.symbol, asset.price]));
+    // Initialise aussi les actifs du catalogue avec leur prix de démo.
+    for (const spec of FEED_SPECS) {
+      if (!prices.has(spec.symbol)) {
+        const asset = findMarketAsset(spec.symbol);
+        if (asset && asset.price > 0) prices.set(spec.symbol, asset.price);
+      }
+    }
     try {
       const marks = (await this.dataSource.query(
         'select symbol, last_price from public.order_book_marks',
@@ -277,20 +286,25 @@ export class MarketDataService implements OnModuleInit, OnModuleDestroy {
   // Lecture (API)
   // ---------------------------------------------------------------------------
 
-  /** Dernier prix de chaque actif, avec sa mini-courbe. Aucune requête SQL. */
+  /**
+   * Dernier prix de chaque actif géré par le moteur, avec sa mini-courbe.
+   * Inclut les 4 actifs natifs ET tous les actifs du catalogue (MSFT, WTI/USD…).
+   * Aucune requête SQL.
+   */
   quotes(): MarketQuote[] {
-    return MARKET_ASSETS.map((asset) => {
-      const state = this.states.get(asset.symbol);
-      const buffer = this.buffers.get(asset.symbol) ?? [];
-      const price = state?.price ?? asset.price;
-      const baseline = this.baselines.get(asset.symbol);
+    return FEED_SPECS.map((spec) => {
+      const asset = findMarketAsset(spec.symbol);
+      const state = this.states.get(spec.symbol);
+      const buffer = this.buffers.get(spec.symbol) ?? [];
+      const price = state?.price ?? asset?.price ?? 0;
+      const baseline = this.baselines.get(spec.symbol);
       const base = baseline?.price ?? buffer[0]?.price ?? price;
       const spark = buffer.filter((_, index) => (buffer.length - 1 - index) % SPARK_STEP === 0);
       return {
-        symbol: asset.symbol,
-        name: asset.name,
-        unit: asset.unit,
-        category: asset.category,
+        symbol: spec.symbol,
+        name: asset?.name ?? spec.symbol,
+        unit: asset?.unit ?? spec.symbol,
+        category: asset?.category ?? 'stock',
         price,
         source: state?.source ?? 'simulated',
         updatedAt: new Date(buffer.at(-1)?.t ?? Date.now()).toISOString(),
@@ -299,6 +313,17 @@ export class MarketDataService implements OnModuleInit, OnModuleDestroy {
         spark: spark.map((point) => point.price),
       };
     });
+  }
+
+  /**
+   * Prix courant d'un seul actif géré par le moteur (utilisé par `/market/spot`
+   * pour les actifs du catalogue à prix mouvant).
+   * Retourne `null` si le symbole n'est pas dans le PriceBook.
+   */
+  quoteFor(symbol: string): MarketQuote | null {
+    const spec = FEED_SPECS.find((s) => s.symbol === symbol);
+    if (!spec) return null;
+    return this.quotes().find((q) => q.symbol === symbol) ?? null;
   }
 
   /** Courbe d'un actif sur une période, ramenée à 300 points au plus. */
