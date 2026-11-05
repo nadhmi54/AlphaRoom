@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "../../../services/apiClient.js";
 import { getHistory, getQuotes, getSpotPrice } from "../../../services/marketService.js";
 
-// Les 4 actifs natifs gérés par le moteur de prix interne.
+// Repli tant que la liste complète des actifs n'est pas chargée : les quatre
+// actifs historiques du moteur.
 const NATIVE_SYMBOLS = new Set(["XAU/USD", "EUR/USD", "BTC/USD", "AAPL"]);
 
 export const QUOTES_REFRESH_MS = 1000;
@@ -35,18 +36,19 @@ const appendPoint = (points, t, price, windowMs, stepMs) => {
  *
  * Retourne :
  *   - `quotes`    : [actif courant uniquement] — pour l'en-tête du graphique.
- *   - `allQuotes` : tous les actifs natifs — pour le TickerTape.
+ *   - `allQuotes` : les quatre actifs natifs — pour le TickerTape.
  *   - `series`    : points de la courbe.
  *
- * Mode natif  (XAU/USD, BTC/USD, EUR/USD, AAPL) :
- *   - GET /market/quotes toutes les secondes.
+ * Mode moteur (tout actif de `assets` : natifs, actions, matières premières,
+ * devises et paires crypto du catalogue) :
+ *   - GET /market/quotes toutes les secondes (une seule requête pour tous).
  *   - GET /market/history pour la courbe historique.
  *
- * Mode custom (paire Binance ex. BNBUSDT) :
+ * Mode custom (paire Binance arbitraire absente du catalogue, ex. DOGEUSDT) :
  *   - GET /market/spot toutes les 2 s.
  *   - GET /market/history → klines Binance REST pour la courbe.
  */
-export default function useLiveMarket(symbol, range) {
+export default function useLiveMarket(symbol, range, assets = []) {
   const [nativeQuotes, setNativeQuotes]     = useState([]);
   const [series, setSeries]                 = useState([]);
   const [error, setError]                   = useState("");
@@ -55,7 +57,19 @@ export default function useLiveMarket(symbol, range) {
   // selected = quotes.find(q => q.symbol === symbol) fonctionne.
   const [customQuote, setCustomQuote]       = useState(null);
 
-  const isCustom = Boolean(symbol) && !NATIVE_SYMBOLS.has(symbol);
+  // Le backend expose tous les actifs du moteur dans `/market/quotes`. On s'appuie
+  // sur ce registre plutôt que sur une liste codée en dur : le catalogue peut
+  // grandir sans déclencher un double polling `/quotes` + `/spot`.
+  const engineSymbols = useMemo(
+    () => new Set(assets.map((asset) => asset.symbol)),
+    [assets],
+  );
+  const isEngine = Boolean(symbol) &&
+    (engineSymbols.size > 0 ? engineSymbols.has(symbol) : NATIVE_SYMBOLS.has(symbol));
+  const isCustom = Boolean(symbol) && !isEngine;
+
+  const engineSymbolsRef = useRef(engineSymbols);
+  engineSymbolsRef.current = engineSymbols;
 
   const inFlight = useRef(false);
   const stopped  = useRef(false);
@@ -95,7 +109,7 @@ export default function useLiveMarket(symbol, range) {
       setError("");
 
       const { symbol: wanted, range: wantedRange } = current.current;
-      if (!NATIVE_SYMBOLS.has(wanted)) return;
+      if (!engineSymbolsRef.current.has(wanted)) return;
       const quote = next.find((q) => q.symbol === wanted);
       if (!quote) return;
       const t = Date.parse(quote.updatedAt);
@@ -175,11 +189,20 @@ export default function useLiveMarket(symbol, range) {
 
   // ── Quotes exposés ────────────────────────────────────────────────────────
   // `quotes`    = [actif courant] pour l'en-tête du graphique.
-  // `allQuotes` = 4 natifs pour le TickerTape (bandeau défilant).
+  // `allQuotes` = 4 natifs pour le TickerTape (bandeau défilant). Le moteur
+  // marque `native` ; on retombe sur la liste historique pour les anciennes
+  // réponses (ou les tests) qui ne portent pas encore ce champ.
+  const allQuotes = useMemo(() => {
+    const flagged = nativeQuotes.filter((q) => q.native !== undefined);
+    return flagged.length > 0
+      ? flagged.filter((q) => q.native)
+      : nativeQuotes.filter((q) => NATIVE_SYMBOLS.has(q.symbol));
+  }, [nativeQuotes]);
+
   const selectedNative = nativeQuotes.find((q) => q.symbol === symbol);
   const quotes = isCustom
     ? (customQuote ? [customQuote] : [])
     : (selectedNative ? [selectedNative] : []);
 
-  return { quotes, allQuotes: nativeQuotes, series, error, loadingSeries };
+  return { quotes, allQuotes, series, error, loadingSeries };
 }

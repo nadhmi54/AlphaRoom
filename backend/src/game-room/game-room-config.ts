@@ -3,19 +3,6 @@
 /** Actifs négociables : symboles internes de la plateforme (cf. market-assets.ts). */
 export type RoomAssets = string[];
 
-/**
- * Paires proposées au Meneur de Jeu mais absentes du catalogue de trading, qui
- * les découvre à la volée via Binance. Ce prix de référence ne sert qu'au marché
- * synthétique et au repli hors flux : il évite de coter ces actifs au prix de
- * l'or du scénario par défaut.
- */
-export const ROOM_EXTRA_REFERENCE_PRICES: Record<string, number> = {
-  'ETH/USDT': 2600,
-  'SOL/USDT': 175,
-  'BNB/USDT': 590,
-  'XRP/USDT': 0.55,
-};
-
 export type GameRoomTimeframe = '1m' | '5m' | '15m' | '30m' | '1h';
 
 export const TIMEFRAME_SECONDS: Record<GameRoomTimeframe, number> = {

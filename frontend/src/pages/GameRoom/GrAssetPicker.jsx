@@ -43,8 +43,12 @@ const fold = (value) =>
  * Sélecteur des actifs négociables d'une salle : la barre de recherche et les
  * quatre marchés de la scène « marché », en sélection multiple. Le nombre
  * d'actifs est libre, le catalogue reste celui que le backend sait coter.
+ *
+ * `quotes` (optionnel) est la cotation du moteur indexée par symbole. Elle est
+ * prioritaire sur le prix de démonstration du catalogue : le wizard n'affiche
+ * jamais un prix statique comme s'il s'agissait du marché.
  */
-export default function GrAssetPicker({ assets, onToggle }) {
+export default function GrAssetPicker({ assets, onToggle, quotes = {} }) {
   const [market, setMarket] = useState(() => {
     const initial = findRoomAsset(assets[0]).marketId;
     return MARKETS.some((item) => item.id === initial) ? initial : MARKETS[0].id;
@@ -120,20 +124,26 @@ export default function GrAssetPicker({ assets, onToggle }) {
           <p className="gr-market-bar__hint">{meta.hint}</p>
 
           <div className="gr-asset-picker" role="group" aria-label={`Actifs ${meta.label}`}>
-            {results.map((asset) => (
-              <button
-                key={asset.symbol}
-                type="button"
-                className={`gr-asset-chip ${assets.includes(asset.symbol) ? 'is-active' : ''}`}
-                aria-pressed={assets.includes(asset.symbol)}
-                onClick={() => onToggle(asset.symbol)}
-                title={`${asset.name} — unité : ${asset.unit}`}
-              >
-                <strong>{asset.symbol}</strong>
-                <small>{asset.name}</small>
-                <small className="gr-asset-chip__price">{formatPrice(asset.price, asset.symbol)} $</small>
-              </button>
-            ))}
+            {results.map((asset) => {
+              const quote = quotes[asset.symbol];
+              const price = quote?.price;
+              return (
+                <button
+                  key={asset.symbol}
+                  type="button"
+                  className={`gr-asset-chip ${assets.includes(asset.symbol) ? 'is-active' : ''}`}
+                  aria-pressed={assets.includes(asset.symbol)}
+                  onClick={() => onToggle(asset.symbol)}
+                  title={`${asset.name} — unité : ${asset.unit}${quote?.source ? ` — flux ${quote.source}` : ''}`}
+                >
+                  <strong>{asset.symbol}</strong>
+                  <small>{asset.name}</small>
+                  <small className="gr-asset-chip__price">
+                    {price != null ? `${formatPrice(price, asset.symbol)} $` : '—'}
+                  </small>
+                </button>
+              );
+            })}
           </div>
 
           {results.length === 0 && (

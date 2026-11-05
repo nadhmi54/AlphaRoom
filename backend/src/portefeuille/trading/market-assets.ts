@@ -57,6 +57,12 @@ export const CATALOG_ASSETS: readonly MarketAsset[] = [
   { symbol: 'USD/CHF', name: 'Dollar/Franc suisse', unit: 'USD', category: 'forex', currency: 'USD', price: 0.882, source: 'demo-fixed-price' },
   { symbol: 'AUD/USD', name: 'Dollar australien/Dollar', unit: 'AUD', category: 'forex', currency: 'USD', price: 0.658, source: 'demo-fixed-price' },
   { symbol: 'USD/CAD', name: 'Dollar/Dollar canadien', unit: 'USD', category: 'forex', currency: 'USD', price: 1.364, source: 'demo-fixed-price' },
+  // Crypto — paires USDT demandées par la Game Room (cotées par Binance).
+  { symbol: 'BTC/USDT', name: 'Bitcoin', unit: 'BTC', category: 'crypto', currency: 'USD', price: 67500, source: 'demo-fixed-price' },
+  { symbol: 'ETH/USDT', name: 'Ethereum', unit: 'ETH', category: 'crypto', currency: 'USD', price: 2600, source: 'demo-fixed-price' },
+  { symbol: 'SOL/USDT', name: 'Solana', unit: 'SOL', category: 'crypto', currency: 'USD', price: 175, source: 'demo-fixed-price' },
+  { symbol: 'BNB/USDT', name: 'BNB', unit: 'BNB', category: 'crypto', currency: 'USD', price: 590, source: 'demo-fixed-price' },
+  { symbol: 'XRP/USDT', name: 'XRP', unit: 'XRP', category: 'crypto', currency: 'USD', price: 0.55, source: 'demo-fixed-price' },
 ];
 
 // ── Registre global des actifs négociables (démarre avec MARKET_ASSETS) ─────────
@@ -107,6 +113,54 @@ export function normalizeSymbol(symbol: string): string {
 /** Clé de comparaison insensible aux séparateurs (`BNB/USDT` = `BNBUSDT`). */
 function symbolKey(symbol: string): string {
   return normalizeSymbol(symbol).replace(/[^A-Z0-9]/g, '');
+}
+
+/**
+ * Nombre de décimales nécessaires pour qu'une variation réelle reste visible.
+ *
+ * C'est la source de vérité partagée par `/marche` et `/game-room`. Un arrondi
+ * fixe à 2 décimales gèle les paires de change (1,08 $) et les petites cryptos
+ * (XRP à 0,55 $) : le prix ne change plus assez pour que le pourcentage bouge.
+ */
+export const ASSET_DECIMALS: Record<string, number> = {
+  'XAU/USD': 2,
+  'XAG/USD': 3,
+  'WTI/USD': 2,
+  'BRENT/USD': 2,
+  'NATGAS/USD': 4,
+  'COPPER/USD': 4,
+  'EUR/USD': 5,
+  'GBP/USD': 5,
+  'USD/JPY': 3,
+  'USD/CHF': 5,
+  'AUD/USD': 5,
+  'USD/CAD': 5,
+  'BTC/USD': 2,
+  'BTC/USDT': 2,
+  'ETH/USDT': 2,
+  'SOL/USDT': 3,
+  'BNB/USDT': 3,
+  'XRP/USDT': 5,
+  AAPL: 2,
+  MSFT: 2,
+  GOOGL: 2,
+  AMZN: 2,
+  TSLA: 2,
+  NVDA: 2,
+  META: 2,
+};
+
+/** Décimales d'un actif ; 6 par défaut pour les paires découvertes à la volée. */
+export function assetDecimals(symbol: string): number {
+  const normalized = normalizeSymbol(symbol);
+  return ASSET_DECIMALS[normalized] ?? 6;
+}
+
+/** Arrondit un prix avec la précision de son actif (jamais un arrondi fixe à 2). */
+export function roundAssetPrice(symbol: string, value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  const factor = 10 ** assetDecimals(symbol);
+  return Math.round(value * factor) / factor;
 }
 
 const knownAssets = new Map<string, MarketAsset>();

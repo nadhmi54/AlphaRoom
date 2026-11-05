@@ -64,7 +64,9 @@ export default function M1MarchePage() {
   const [actionError, setActionError] = useState("");
   const [lastSync, setLastSync] = useState(null);
 
-  const market = useLiveMarket(selectedSymbol, range);
+  // `assets` permet au hook de savoir quels symboles le moteur cote déjà :
+  // le catalogue n'est plus traité comme une paire Binance « custom ».
+  const market = useLiveMarket(selectedSymbol, range, assets);
   const { toasts, push: pushToast, dismiss: dismissToast } = useToasts();
   const pulse = usePulse(account?.portfolio?.totalValue, lastSync);
 

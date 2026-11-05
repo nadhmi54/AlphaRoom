@@ -173,11 +173,13 @@ function seedPosition(
 
 /** Les actifs exigés : crypto (native et Binance), or, forex, actions et pétrole. */
 const ASSETS = [
-  { symbol: 'ETH/USDT', binanceSymbol: 'ETHUSDT', price: 2500, quantity: 1 },
-  { symbol: 'BNB/USDT', binanceSymbol: 'BNBUSDT', price: 700, quantity: 1 },
+  // Les paires USDT sont désormais dans le catalogue commun : le carnet prend
+  // le prix de référence du catalogue, pas un prix Binance séparé.
+  { symbol: 'ETH/USDT', binanceSymbol: 'ETHUSDT', price: 2600, quantity: 1 },
+  { symbol: 'BNB/USDT', binanceSymbol: 'BNBUSDT', price: 590, quantity: 1 },
   { symbol: 'BTC/USD', binanceSymbol: null, price: 67500, quantity: 0.1 },
-  { symbol: 'SOL/USDT', binanceSymbol: 'SOLUSDT', price: 150, quantity: 5 },
-  { symbol: 'XRP/USDT', binanceSymbol: 'XRPUSDT', price: 2.2, quantity: 100 },
+  { symbol: 'SOL/USDT', binanceSymbol: 'SOLUSDT', price: 175, quantity: 5 },
+  { symbol: 'XRP/USDT', binanceSymbol: 'XRPUSDT', price: 0.55, quantity: 100 },
   { symbol: 'XAU/USD', binanceSymbol: null, price: 2685.4, quantity: 0.5 },
   { symbol: 'EUR/USD', binanceSymbol: null, price: 1.0834, quantity: 100 },
   { symbol: 'AAPL', binanceSymbol: null, price: 224.5, quantity: 1 },
@@ -242,9 +244,19 @@ describe('OrderBookService — carnet multi-marchés', () => {
 
     expect(eth.symbol).toBe('ETH/USDT');
     expect(bnb.symbol).toBe('BNB/USDT');
-    expect(eth.lastPrice).toBeCloseTo(2500, 2);
-    expect(bnb.lastPrice).toBeCloseTo(700, 2);
+    expect(eth.lastPrice).toBeCloseTo(2600, 2);
+    expect(bnb.lastPrice).toBeCloseTo(590, 2);
     expect(eth.lastPrice).not.toBe(bnb.lastPrice);
+  });
+
+  it('découvre une paire absente du catalogue via Binance REST', async () => {
+    const { service, binance } = buildHarness({ binancePrices: { DOGEUSDT: 0.25 } });
+
+    const book = await service.getBook('dogeusdt');
+
+    expect(book.symbol).toBe('DOGE/USDT');
+    expect(book.lastPrice).toBeCloseTo(0.25, 4);
+    expect(binance.getPrice).toHaveBeenCalledWith('DOGEUSDT');
   });
 });
 

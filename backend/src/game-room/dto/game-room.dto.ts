@@ -16,13 +16,16 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { CATALOG_ASSETS, MARKET_ASSETS } from '../../portefeuille/trading/market-assets.js';
-import { HISTORY_RANGE_CHOICES, ROOM_EXTRA_REFERENCE_PRICES } from '../game-room-config.js';
+import { HISTORY_RANGE_CHOICES } from '../game-room-config.js';
 
-/** Actifs négociables proposés à la création d'une salle (les quatre marchés). */
+/**
+ * Actifs négociables proposés à la création d'une salle (les quatre marchés).
+ * Le catalogue contient désormais aussi les paires crypto USDT : plus aucun
+ * actif de la Game Room n'est coté par une table de prix statique séparée.
+ */
 export const ROOM_ASSET_CHOICES = [
   ...MARKET_ASSETS.map((asset) => asset.symbol),
   ...CATALOG_ASSETS.map((asset) => asset.symbol),
-  ...Object.keys(ROOM_EXTRA_REFERENCE_PRICES),
 ];
 
 export const SOURCE_MODES = ['scenario', 'synthetic', 'historical', 'csv', 'live'] as const;

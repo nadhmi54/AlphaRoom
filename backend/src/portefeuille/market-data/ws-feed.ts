@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import { createRequire } from 'node:module';
 import type { FeedSpec } from './market-feed-config.js';
 import type { RealTick } from './price-book.js';
 
@@ -14,6 +15,12 @@ export interface SocketLike {
 
 export type SocketFactory = (url: string) => SocketLike;
 
+/** Contrat minimal d'un flux de prix, WebSocket ou polling REST. */
+export interface MarketFeed {
+  start(): void;
+  stop(): void;
+}
+
 /**
  * WebSocket global : disponible nativement depuis Node 22.
  * Sur Node 18/20, on utilise la classe WebSocket d'undici (intégrée à Node 18+).
@@ -23,16 +30,20 @@ function resolveWebSocket(): new (url: string) => SocketLike {
   // Node 22+ expose WebSocket globalement.
   if (typeof WebSocket !== 'undefined') return WebSocket as unknown as new (url: string) => SocketLike;
   try {
-    // undici est intégré à Node 18+ et expose WebSocket depuis sa v5.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { WebSocket: UndiciWS } = require('undici') as { WebSocket: new (url: string) => SocketLike };
+    // Le backend est un module ES : `require` n'existe pas tel quel, d'où
+    // createRequire. undici expose WebSocket depuis sa v5.
+    const { WebSocket: UndiciWS } = createRequire(import.meta.url)('undici') as {
+      WebSocket: new (url: string) => SocketLike;
+    };
     if (typeof UndiciWS !== 'undefined') return UndiciWS;
   } catch {
     // undici absent ou trop ancien : on laisse la fabrique par défaut lever l'erreur.
   }
   return class NoWebSocket {
     constructor(_url: string) {
-      throw new Error('WebSocket indisponible — mettez à jour vers Node 22 ou installez le paquet ws.');
+      throw new Error(
+        'WebSocket indisponible — utilisez Node 22+ ou installez le paquet undici.',
+      );
     }
     onopen = null; onmessage = null; onclose = null; onerror = null;
     send() { /* noop */ }
@@ -51,7 +62,7 @@ const MAX_BACKOFF_MS = 30_000;
  * plafonné à 30 s). Les sous-classes disent seulement où se connecter, quoi
  * envoyer à l'ouverture et comment lire un message.
  */
-export abstract class WsFeed {
+export abstract class WsFeed implements MarketFeed {
   protected readonly logger: Logger;
   private socket: SocketLike | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;

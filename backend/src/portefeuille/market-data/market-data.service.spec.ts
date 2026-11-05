@@ -132,6 +132,25 @@ describe('MarketDataService', () => {
     expect((await service.history('NOPE', '5m')).points).toEqual([]);
   });
 
+  it('expose la précision de chaque actif et le drapeau natif du bandeau', () => {
+    const { service } = build();
+    const bySymbol = new Map(service.quotes().map((q) => [q.symbol, q]));
+
+    expect(bySymbol.get('XAU/USD')).toMatchObject({ native: true, decimals: 2 });
+    expect(bySymbol.get('EUR/USD')).toMatchObject({ native: true, decimals: 5 });
+    expect(bySymbol.get('BTC/USDT')).toMatchObject({ native: false, decimals: 2 });
+    expect(bySymbol.get('XRP/USDT')).toMatchObject({ decimals: 5 });
+    expect(bySymbol.get('USD/JPY')).toMatchObject({ decimals: 3 });
+  });
+
+  it('quoteFor accepte les alias Binance et renvoie le symbole canonique', () => {
+    const { service } = build();
+    expect(service.quoteFor('btcusdt')?.symbol).toBe('BTC/USDT');
+    expect(service.quoteFor('ETHUSDT')?.symbol).toBe('ETH/USDT');
+    expect(service.quoteFor('xrpusdt')?.symbol).toBe('XRP/USDT');
+    expect(service.quoteFor('NOPE')).toBeNull();
+  });
+
   it("quoteFor renvoie le prix mouvant d'un actif du catalogue (MSFT, WTI/USD, USD/JPY)", async () => {
     const { service } = build();
     await service.start(seeded());

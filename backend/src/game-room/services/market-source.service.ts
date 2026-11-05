@@ -5,14 +5,16 @@ import { Repository } from 'typeorm';
 import { GameRoom } from '../entities/game-room.entity.js';
 import { GameSnapshot } from '../entities/game-snapshot.entity.js';
 import { MarketDataService } from '../../portefeuille/market-data/market-data.service.js';
-import { findMarketAsset, normalizeSymbol } from '../../portefeuille/trading/market-assets.js';
+import {
+  findMarketAsset,
+  roundAssetPrice,
+} from '../../portefeuille/trading/market-assets.js';
 import {
   calculateScenarioPrice,
   PANIC_TUESDAY_SCENARIO,
 } from '../scenario/panic-tuesday.scenario.js';
 import {
   HISTORY_RANGE_SECONDS,
-  ROOM_EXTRA_REFERENCE_PRICES,
   TIMEFRAME_SECONDS,
   naturalSpreadPercent,
   syntheticPrice,
@@ -153,8 +155,11 @@ export class MarketSourceService {
     const config = room.sourceConfig ?? {};
 
     const base = await this.resolveBasePrice(room, active, elapsed, config);
-    const price = round2(Math.max(0.000001, base.price + shocks.priceOffset));
-    const spread = round2(
+    // Précision propre à l'actif : un arrondi fixe à 2 décimales figeait EUR/USD,
+    // XAG/USD, NATGAS/USD et XRP/USDT (variation affichée à 0,00 %).
+    const price = roundAssetPrice(active, Math.max(0.000001, base.price + shocks.priceOffset));
+    const spread = roundAssetPrice(
+      active,
       Math.max(0.000001, base.spread * Number(room.spreadMultiplier ?? 1) * shocks.spreadMultiplier),
     );
 
@@ -219,8 +224,14 @@ export class MarketSourceService {
         return { price: fallback, spread: spreadFromPrice(symbol, fallback), source: 'synthetic' };
       }
       case 'live': {
-        const price = await this.livePrice(room, symbol, elapsed);
-        return { price, spread: spreadFromPrice(symbol, price), source: 'live' };
+        const live = await this.livePrice(room, symbol, elapsed);
+        return {
+          price: live.price,
+          spread: spreadFromPrice(symbol, live.price),
+          // Si le flux réel n'a pas de tick frais, le moteur renvoie un prix
+          // simulé autour du dernier tick : on ne le présente pas comme live.
+          source: live.source,
+        };
       }
       case 'scenario':
       default: {
@@ -234,25 +245,57 @@ export class MarketSourceService {
     return {
       ...config,
       initialPrice:
-        config.initialPrice && config.initialPrice > 0 ? config.initialPrice : referencePrice(symbol),
+        config.initialPrice && config.initialPrice > 0
+          ? config.initialPrice
+          : this.referencePrice(symbol),
     };
+  }
+
+  /**
+   * Ancre réelle d'un actif de salle. Le moteur de prix est prioritaire (dernier
+   * prix live ou simulé autour du dernier tick réel), puis le prix bootstrap du
+   * catalogue. Aucune table de prix statique spécifique à la Game Room.
+   */
+  private referencePrice(symbol: string): number {
+    const engine = this.marketData.quoteFor(symbol);
+    if (engine && engine.price > 0) return engine.price;
+    const known = findMarketAsset(symbol)?.price;
+    if (known && known > 0) return known;
+    return PANIC_TUESDAY_SCENARIO.initialPrice;
   }
 
   /**
    * Prix live partagé : le premier appelant d'un intervalle de 2 secondes enregistre
    * le prix du flux, les suivants relisent la même valeur (index unique partiel).
    */
-  private async livePrice(room: GameRoom, symbol: string, elapsed: number): Promise<number> {
+  private async livePrice(
+    room: GameRoom,
+    symbol: string,
+    elapsed: number,
+  ): Promise<{ price: number; source: 'live' | 'synthetic' }> {
     const bucket = Math.floor(elapsed / LIVE_BUCKET_SECONDS) * LIVE_BUCKET_SECONDS;
     const stored = await this.readLiveSnapshot(room.id, bucket, symbol);
-    if (stored !== null) return stored;
+    if (stored !== null) {
+      // Le snapshot partagé ne stocke que le prix ; la provenance est relue
+      // dans le moteur (toujours la même source de vérité).
+      const current = this.marketData.quoteFor(symbol);
+      return { price: stored, source: current?.source === 'live' ? 'live' : 'synthetic' };
+    }
 
-    const quote = this.marketData.quotes().find((item) => item.symbol === symbol);
-    const price = round2(quote?.price ?? findMarketAsset(symbol)?.price ?? 0);
+    const quote = this.marketData.quoteFor(symbol);
+    const price = roundAssetPrice(symbol, quote?.price ?? findMarketAsset(symbol)?.price ?? 0);
     if (price <= 0) {
       this.logger.warn(`Aucun prix disponible pour ${symbol} : repli sur le marché synthétique.`);
-      return syntheticPrice(elapsed, totalSimSeconds(room), this.syntheticConfig(symbol, room.sourceConfig ?? {}));
+      return {
+        price: syntheticPrice(
+          elapsed,
+          totalSimSeconds(room),
+          this.syntheticConfig(symbol, room.sourceConfig ?? {}),
+        ),
+        source: 'synthetic',
+      };
     }
+    const source: 'live' | 'synthetic' = quote?.source === 'live' ? 'live' : 'synthetic';
 
     await this.dataSource.query(
       `insert into public.game_snapshots (room_id, sim_elapsed_seconds, state)
@@ -265,14 +308,14 @@ export class MarketSourceService {
           kind: 'live_price',
           symbol,
           price,
-          source: quote?.source ?? 'live',
+          source,
           recordedAt: new Date().toISOString(),
         }),
       ],
     );
 
     const winner = await this.readLiveSnapshot(room.id, bucket, symbol);
-    return winner ?? price;
+    return { price: winner ?? price, source };
   }
 
   private async readLiveSnapshot(roomId: string, bucket: number, symbol: string): Promise<number | null> {
@@ -362,7 +405,10 @@ export class MarketSourceService {
     const series: SeriesPoint[] = [];
     for (let i = 0; i < points; i++) {
       const t = Math.round(i * step);
-      series.push({ t, price: round2(Math.max(0.000001, sample(t) + shocks.priceOffset)) });
+      series.push({
+        t,
+        price: roundAssetPrice(symbol, Math.max(0.000001, sample(t) + shocks.priceOffset)),
+      });
     }
     const current = await this.getMarketState(room, symbol);
     if (series.at(-1)?.t !== current.elapsedSeconds) {
@@ -380,7 +426,8 @@ export class MarketSourceService {
   ): Promise<CandlePoint[]> {
     const sample = await this.sampler(room, symbol);
     const shocks = this.getShocks(room.id);
-    const at = (t: number) => round2(Math.max(0.000001, sample(t) + shocks.priceOffset));
+    const at = (t: number) =>
+      roundAssetPrice(symbol, Math.max(0.000001, sample(t) + shocks.priceOffset));
     const bucket = TIMEFRAME_SECONDS[(timeframe ?? room.timeframe) as GameRoomTimeframe] ?? 60;
     const candles: CandlePoint[] = [];
     const lastBucket = Math.floor(elapsed / bucket);
@@ -485,26 +532,12 @@ function clamp(value: number, max: number): number {
   return Math.max(0, Math.min(Math.round(value), max));
 }
 
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
-}
-
 function datasetKey(roomId: string, symbol: string): string {
   return `${roomId}:${symbol}`;
 }
 
 function spreadFromPrice(symbol: string, price: number): number {
   return Math.max(0.000001, (price * naturalSpreadPercent(symbol)) / 100);
-}
-
-/**
- * Prix de départ d'un actif de salle : catalogue de trading d'abord, puis les
- * paires du catalogue Game Room que le trading découvre à la volée.
- */
-function referencePrice(symbol: string): number {
-  const known = findMarketAsset(symbol)?.price;
-  if (known && known > 0) return known;
-  return ROOM_EXTRA_REFERENCE_PRICES[normalizeSymbol(symbol)] ?? PANIC_TUESDAY_SCENARIO.initialPrice;
 }
 
 /** Interpolation linéaire d'une série indexée en secondes de simulation. */

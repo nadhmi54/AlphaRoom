@@ -28,7 +28,11 @@ function source() {
   return new MarketSourceService(
     { query: async () => [] } as never,
     {} as never,
-    { quotes: () => [], history: async () => ({ points: [] }) } as never,
+    {
+      quotes: () => [],
+      quoteFor: () => null,
+      history: async () => ({ points: [] }),
+    } as never,
   );
 }
 

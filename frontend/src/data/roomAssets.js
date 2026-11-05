@@ -4,26 +4,27 @@
 export const ROOM_ASSETS = [
   // ── Matières premières ────────────────────────────────────────────────────
   { symbol: 'XAU/USD', name: 'Or', unit: 'once troy (oz)', unitShort: 'oz', category: 'Matières premières', marketId: 'commodity', price: 2685.4, decimals: 2, qtyDecimals: 3 },
-  { symbol: 'XAG/USD', name: 'Argent', unit: 'once troy (oz)', unitShort: 'oz', category: 'Matières premières', marketId: 'commodity', price: 31.25, decimals: 2, qtyDecimals: 3 },
+  { symbol: 'XAG/USD', name: 'Argent', unit: 'once troy (oz)', unitShort: 'oz', category: 'Matières premières', marketId: 'commodity', price: 31.25, decimals: 3, qtyDecimals: 3 },
   { symbol: 'WTI/USD', name: 'Pétrole WTI', unit: 'baril', unitShort: 'bbl', category: 'Matières premières', marketId: 'commodity', price: 72.4, decimals: 2, qtyDecimals: 2 },
   { symbol: 'BRENT/USD', name: 'Pétrole Brent', unit: 'baril', unitShort: 'bbl', category: 'Matières premières', marketId: 'commodity', price: 76.1, decimals: 2, qtyDecimals: 2 },
-  { symbol: 'NATGAS/USD', name: 'Gaz naturel', unit: 'MMBtu', unitShort: 'MMBtu', category: 'Matières premières', marketId: 'commodity', price: 2.95, decimals: 3, qtyDecimals: 1 },
-  { symbol: 'COPPER/USD', name: 'Cuivre', unit: 'livre', unitShort: 'lb', category: 'Matières premières', marketId: 'commodity', price: 4.35, decimals: 3, qtyDecimals: 2 },
+  { symbol: 'NATGAS/USD', name: 'Gaz naturel', unit: 'MMBtu', unitShort: 'MMBtu', category: 'Matières premières', marketId: 'commodity', price: 2.95, decimals: 4, qtyDecimals: 1 },
+  { symbol: 'COPPER/USD', name: 'Cuivre', unit: 'livre', unitShort: 'lb', category: 'Matières premières', marketId: 'commodity', price: 4.35, decimals: 4, qtyDecimals: 2 },
 
   // ── Devises (Forex) ───────────────────────────────────────────────────────
-  { symbol: 'EUR/USD', name: 'Euro/Dollar', unit: 'EUR', unitShort: 'EUR', category: 'Forex', marketId: 'forex', price: 1.0834, decimals: 4, qtyDecimals: 2 },
-  { symbol: 'GBP/USD', name: 'Livre sterling/Dollar', unit: 'GBP', unitShort: 'GBP', category: 'Forex', marketId: 'forex', price: 1.2712, decimals: 4, qtyDecimals: 2 },
-  { symbol: 'USD/JPY', name: 'Dollar/Yen', unit: 'USD', unitShort: 'USD', category: 'Forex', marketId: 'forex', price: 149.85, decimals: 2, qtyDecimals: 2 },
-  { symbol: 'USD/CHF', name: 'Dollar/Franc suisse', unit: 'USD', unitShort: 'USD', category: 'Forex', marketId: 'forex', price: 0.882, decimals: 4, qtyDecimals: 2 },
-  { symbol: 'AUD/USD', name: 'Dollar australien/Dollar', unit: 'AUD', unitShort: 'AUD', category: 'Forex', marketId: 'forex', price: 0.658, decimals: 4, qtyDecimals: 2 },
-  { symbol: 'USD/CAD', name: 'Dollar/Dollar canadien', unit: 'USD', unitShort: 'USD', category: 'Forex', marketId: 'forex', price: 1.364, decimals: 4, qtyDecimals: 2 },
+  { symbol: 'EUR/USD', name: 'Euro/Dollar', unit: 'EUR', unitShort: 'EUR', category: 'Forex', marketId: 'forex', price: 1.0834, decimals: 5, qtyDecimals: 2 },
+  { symbol: 'GBP/USD', name: 'Livre sterling/Dollar', unit: 'GBP', unitShort: 'GBP', category: 'Forex', marketId: 'forex', price: 1.2712, decimals: 5, qtyDecimals: 2 },
+  { symbol: 'USD/JPY', name: 'Dollar/Yen', unit: 'USD', unitShort: 'USD', category: 'Forex', marketId: 'forex', price: 149.85, decimals: 3, qtyDecimals: 2 },
+  { symbol: 'USD/CHF', name: 'Dollar/Franc suisse', unit: 'USD', unitShort: 'USD', category: 'Forex', marketId: 'forex', price: 0.882, decimals: 5, qtyDecimals: 2 },
+  { symbol: 'AUD/USD', name: 'Dollar australien/Dollar', unit: 'AUD', unitShort: 'AUD', category: 'Forex', marketId: 'forex', price: 0.658, decimals: 5, qtyDecimals: 2 },
+  { symbol: 'USD/CAD', name: 'Dollar/Dollar canadien', unit: 'USD', unitShort: 'USD', category: 'Forex', marketId: 'forex', price: 1.364, decimals: 5, qtyDecimals: 2 },
 
   // ── Crypto ────────────────────────────────────────────────────────────────
   { symbol: 'BTC/USD', name: 'Bitcoin', unit: 'BTC', unitShort: 'BTC', category: 'Crypto', marketId: 'crypto', price: 67500, decimals: 2, qtyDecimals: 6 },
+  { symbol: 'BTC/USDT', name: 'Bitcoin', unit: 'BTC', unitShort: 'BTC', category: 'Crypto', marketId: 'crypto', price: 67500, decimals: 2, qtyDecimals: 6 },
   { symbol: 'ETH/USDT', name: 'Ethereum', unit: 'ETH', unitShort: 'ETH', category: 'Crypto', marketId: 'crypto', price: 2600, decimals: 2, qtyDecimals: 5 },
-  { symbol: 'SOL/USDT', name: 'Solana', unit: 'SOL', unitShort: 'SOL', category: 'Crypto', marketId: 'crypto', price: 175, decimals: 2, qtyDecimals: 4 },
-  { symbol: 'BNB/USDT', name: 'BNB', unit: 'BNB', unitShort: 'BNB', category: 'Crypto', marketId: 'crypto', price: 590, decimals: 2, qtyDecimals: 4 },
-  { symbol: 'XRP/USDT', name: 'XRP', unit: 'XRP', unitShort: 'XRP', category: 'Crypto', marketId: 'crypto', price: 0.55, decimals: 4, qtyDecimals: 2 },
+  { symbol: 'SOL/USDT', name: 'Solana', unit: 'SOL', unitShort: 'SOL', category: 'Crypto', marketId: 'crypto', price: 175, decimals: 3, qtyDecimals: 4 },
+  { symbol: 'BNB/USDT', name: 'BNB', unit: 'BNB', unitShort: 'BNB', category: 'Crypto', marketId: 'crypto', price: 590, decimals: 3, qtyDecimals: 4 },
+  { symbol: 'XRP/USDT', name: 'XRP', unit: 'XRP', unitShort: 'XRP', category: 'Crypto', marketId: 'crypto', price: 0.55, decimals: 5, qtyDecimals: 2 },
 
   // ── Actions ───────────────────────────────────────────────────────────────
   { symbol: 'AAPL', name: 'Apple', unit: 'action', unitShort: 'act.', category: 'Actions', marketId: 'stock', price: 224.5, decimals: 2, qtyDecimals: 2 },
@@ -79,6 +80,39 @@ export function formatPrice(value, symbol) {
   });
 }
 
+/**
+ * Montant (variation absolue, spread) formaté avec la précision de l'actif.
+ * Contrairement à `formatPrice`, zéro et les valeurs négatives restent visibles.
+ */
+export function formatAmount(value, symbol, { signed = false } = {}) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return '—';
+  const digits = assetDecimals(symbol);
+  const text = Math.abs(num).toLocaleString('fr-FR', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+  if (num < 0) return `-${text}`;
+  return signed ? `+${text}` : text;
+}
+
+/**
+ * Pourcentage avec assez de décimales pour qu'un petit mouvement réel reste
+ * lisible : sans cela, EUR/USD ou XRP/USDT affichent « 0,00 % » alors que le
+ * prix a bougé.
+ */
+export function formatChangePercent(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return '—';
+  const magnitude = Math.abs(num);
+  const digits = magnitude > 0 && magnitude < 0.01 ? 4 : 2;
+  const text = magnitude.toLocaleString('fr-FR', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+  return `${num > 0 ? '+' : num < 0 ? '-' : ''}${text} %`;
+}
+
 // Sources de données marché proposées au Meneur de Jeu.
 export const SOURCE_MODES = [
   {
@@ -104,7 +138,7 @@ export const SOURCE_MODES = [
   {
     value: 'live',
     label: 'Marché en direct',
-    hint: 'Suit les cotations réelles (Binance / Finnhub). Vitesse imposée à 1x, horodatage réel.',
+    hint: 'Suit les cotations réelles (Binance, Yahoo Finance / Finnhub). Vitesse imposée à 1x, horodatage réel.',
   },
 ];
 

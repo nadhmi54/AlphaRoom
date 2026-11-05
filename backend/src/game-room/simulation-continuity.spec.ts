@@ -11,10 +11,16 @@
 import { describe, expect, it } from 'vitest';
 import { FEED_SPECS } from '../portefeuille/market-data/market-feed-config.js';
 import { PriceBook } from '../portefeuille/market-data/price-book.js';
-import { MARKET_ASSETS, findMarketAsset } from '../portefeuille/trading/market-assets.js';
+import {
+  MARKET_ASSETS,
+  assetDecimals,
+  findMarketAsset,
+  roundAssetPrice,
+} from '../portefeuille/trading/market-assets.js';
+import type { GameRoom } from './entities/game-room.entity.js';
 import type { MarketSourceConfig } from './game-room-config.js';
 import {
-  interpolate,
+  MarketSourceService,
   interpolateOrContinue,
 } from './services/market-source.service.js';
 
@@ -185,5 +191,109 @@ describe('Arrondi JPY — pas de variation = 0 %', () => {
     const spread = (price * spreadPct) / 100; // = 0.018 JPY
     const roundedSpread = Math.round(spread * 100) / 100; // = 0.02 JPY
     expect(roundedSpread).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suite 5 — MarketSourceService : arrondi adaptatif pendant une séance de 30 min
+// ---------------------------------------------------------------------------
+describe('Simulation 30 minutes — MarketSourceService (arrondi par actif)', () => {
+  const SIM_SECONDS = 30 * 60;
+  const LAST_5_MIN_START = SIM_SECONDS - 5 * 60;
+
+  function serviceFor(symbol: string, price: number): MarketSourceService {
+    return new MarketSourceService(
+      { query: async () => [] } as never,
+      {} as never,
+      {
+        quotes: () => [],
+        // Aucun titre live en mode synthétique : le prix initial vient de la salle.
+        quoteFor: () => ({ symbol, price, source: 'simulated' }),
+        history: async () => ({ points: [] }),
+      } as never,
+    );
+  }
+
+  function syntheticRoom(symbol: string, price: number): GameRoom {
+    return {
+      id: `room-${symbol}`,
+      status: 'paused',
+      startedAt: null,
+      pausedAt: null,
+      simElapsedSeconds: 0,
+      playbackSpeed: '1',
+      totalSimSeconds: SIM_SECONDS,
+      durationMinutes: 30,
+      timeframe: '1m',
+      sourceMode: 'synthetic',
+      sourceConfig: {
+        initialPrice: price,
+        volatilityPercent: 5,
+        trendPercent: 0,
+        seed: 17,
+      },
+      assets: [symbol],
+      spreadMultiplier: '1',
+      historyStartAt: null,
+      historyEndAt: null,
+    } as GameRoom;
+  }
+
+  it('chaque actif bouge encore dans les 5 dernières minutes, sans arrondi fixe à 2 décimales', async () => {
+    for (const spec of FEED_SPECS) {
+      const symbol = spec.symbol;
+      const price = findMarketAsset(symbol)?.price ?? 100;
+      const service = serviceFor(symbol, price);
+      const room = syntheticRoom(symbol, price);
+
+      const last5: number[] = [];
+      let firstPrice = 0;
+      let lastPrice = 0;
+
+      for (let t = 0; t <= SIM_SECONDS; t += 5) {
+        room.simElapsedSeconds = t;
+        const state = await service.getMarketState(room, symbol);
+        if (t === 0) firstPrice = state.price;
+        lastPrice = state.price;
+        if (t >= LAST_5_MIN_START) last5.push(state.price);
+
+        // Le prix respecte la précision de l'actif (pas d'arrondi global).
+        expect(state.price, `${symbol} à t=${t}s`).toBe(roundAssetPrice(symbol, state.price));
+        expect(state.price, `${symbol} à t=${t}s`).toBeGreaterThan(0);
+      }
+
+      expect(last5.length).toBeGreaterThan(1);
+      const min = Math.min(...last5);
+      const max = Math.max(...last5);
+      expect(max - min, `${symbol}: prix figé dans les 5 dernières minutes`)
+        .toBeGreaterThan(0);
+
+      const changePct = firstPrice > 0 ? Math.abs((lastPrice - firstPrice) / firstPrice) * 100 : 0;
+      expect(changePct, `${symbol}: variation totale nulle (arrondi ?)`).toBeGreaterThan(0);
+
+      // Une paire de change doit garder ses décimales naturelles (5 pour EUR/USD).
+      if (symbol === 'EUR/USD') expect(assetDecimals(symbol)).toBe(5);
+      if (symbol === 'XRP/USDT') expect(assetDecimals(symbol)).toBe(5);
+    }
+  });
+
+  it('deux lectures du même instant renvoient le même prix (chart = carnet = P&L)', async () => {
+    for (const spec of FEED_SPECS) {
+      const symbol = spec.symbol;
+      const price = findMarketAsset(symbol)?.price ?? 100;
+      const service = serviceFor(symbol, price);
+      const room = syntheticRoom(symbol, price);
+      room.simElapsedSeconds = 1750;
+
+      const [chart, book] = await Promise.all([
+        service.getMarketState(room, symbol),
+        service.getMarketState(room, symbol),
+      ]);
+      expect(book.price, `${symbol}`).toBe(chart.price);
+
+      // Le carnet se construit autour de ce même prix : le spread reste > 0.
+      expect(chart.spread).toBeGreaterThan(0);
+      expect(chart.spread).toBe(roundAssetPrice(symbol, chart.spread));
+    }
   });
 });

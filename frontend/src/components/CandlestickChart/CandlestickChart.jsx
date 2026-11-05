@@ -16,7 +16,6 @@ export default function CandlestickChart({
   candles = [],
   height = 280,
   priceLines = [],
-  symbol = '',
   currency = '$',
   formatTime,
   emptyText = 'En attente de données…',

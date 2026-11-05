@@ -2,7 +2,11 @@ import { Inject, Injectable, Logger, type OnModuleDestroy, type OnModuleInit } f
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { OrderBookService } from '../order-book/order-book.service.js';
-import { MARKET_ASSETS, findMarketAsset } from '../trading/market-assets.js';
+import {
+  MARKET_ASSETS,
+  assetDecimals,
+  findMarketAsset,
+} from '../trading/market-assets.js';
 import { BinanceFeed } from './binance-feed.js';
 import { FinnhubFeed } from './finnhub-feed.js';
 import {
@@ -11,10 +15,12 @@ import {
   MARK_EVERY_TICKS,
   RETENTION_HOURS,
   TICK_INTERVAL_MS,
+  canonicalEngineSymbol,
   type HistoryRange,
 } from './market-feed-config.js';
 import { PriceBook, type PriceState, type RealTick } from './price-book.js';
-import type { WsFeed } from './ws-feed.js';
+import type { MarketFeed } from './ws-feed.js';
+import { YahooFeed } from './yahoo-feed.js';
 
 /** Même espace de verrou que le carnet d'ordres : voir OrderBookService.lockSymbol. */
 const ADVISORY_NAMESPACE = 'alpharoom.order_book';
@@ -36,6 +42,10 @@ export interface MarketQuote {
   unit: string;
   category: string;
   price: number;
+  /** Décimales d'affichage/arrondi propres à l'actif. */
+  decimals: number;
+  /** Fait partie des quatre actifs historiques du bandeau M1. */
+  native: boolean;
   source: 'live' | 'simulated';
   updatedAt: string;
   /** Variation depuis le plus ancien prix gardé (24 h au plus). */
@@ -49,7 +59,7 @@ export interface MarketQuote {
 export class MarketDataService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(MarketDataService.name);
   private book: PriceBook | null = null;
-  private feeds: WsFeed[] = [];
+  private feeds: MarketFeed[] = [];
   private timer: ReturnType<typeof setInterval> | null = null;
   private ticks = 0;
   private lastStepAt = 0;
@@ -66,7 +76,7 @@ export class MarketDataService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   /** Remplaçable dans les tests pour ne jamais ouvrir de vraie connexion. */
-  feedFactory?: (onTick: (tick: RealTick) => void) => WsFeed[];
+  feedFactory?: (onTick: (tick: RealTick) => void) => MarketFeed[];
 
   // ---------------------------------------------------------------------------
   // Cycle de vie
@@ -104,25 +114,34 @@ export class MarketDataService implements OnModuleInit, OnModuleDestroy {
 
     this.timer = setInterval(() => void this.runTick(Date.now()), TICK_INTERVAL_MS);
     this.timer.unref?.();
-    this.logger.log(`Moteur de prix démarré (${FEED_SPECS.length} actifs, 1 prix/s).`);
+    this.logger.log(
+      `Moteur de prix démarré (${FEED_SPECS.length} actifs, ${this.feeds.length} flux, 1 prix/s).`,
+    );
   }
 
-  private createFeeds(onTick: (tick: RealTick) => void): WsFeed[] {
-    const binanceSpecs = FEED_SPECS.filter((spec) => spec.provider === 'binance');
-    const feeds: WsFeed[] = [new BinanceFeed(binanceSpecs, onTick)];
+  private createFeeds(onTick: (tick: RealTick) => void): MarketFeed[] {
+    const feeds: MarketFeed[] = [];
 
+    const binanceSpecs = FEED_SPECS.filter((spec) => spec.provider === 'binance');
+    if (binanceSpecs.length > 0) feeds.push(new BinanceFeed(binanceSpecs, onTick));
+
+    // Yahoo couvre actions, matières premières et devises. Sans clé Finnhub,
+    // AAPL rejoint ce flux au lieu de rester sur un prix de démonstration.
     const finnhubKey = this.config.get<string>('FINNHUB_API_KEY');
     const finnhubSpecs = FEED_SPECS.filter((spec) => spec.provider === 'finnhub');
-    if (finnhubKey) {
+    const yahooSpecs = FEED_SPECS.filter(
+      (spec) => spec.provider === 'yahoo' || (spec.provider === 'finnhub' && !finnhubKey),
+    );
+    if (yahooSpecs.length > 0) feeds.push(new YahooFeed(yahooSpecs, onTick));
+
+    if (finnhubKey && finnhubSpecs.length > 0) {
       feeds.push(new FinnhubFeed(finnhubSpecs, finnhubKey, onTick));
-    } else {
-      this.logger.warn(
-        'FINNHUB_API_KEY absente : les actions (AAPL) resteront en simulation. ' +
-          'Crée une clé gratuite sur finnhub.io et ajoute-la dans backend/.env.',
+    } else if (finnhubSpecs.length > 0) {
+      this.logger.log(
+        'FINNHUB_API_KEY absente : AAPL utilise le flux Yahoo Finance (prix réel).',
       );
     }
-    // Les actifs provider:'none' (catalogue) n'ont pas de flux : ils restent en
-    // simulation brownienne — aucun feed à créer pour eux.
+
     return feeds;
   }
 
@@ -189,7 +208,9 @@ export class MarketDataService implements OnModuleInit, OnModuleDestroy {
        select * from unnest($1::varchar[], $2::numeric[], $3::varchar[], $4::timestamptz[])`,
       [
         states.map((s) => s.symbol),
-        states.map((s) => s.price.toFixed(6)),
+        // 8 décimales : une variation de XRP à 0,55 $ ne doit pas être écrasée
+        // par la précision de stockage.
+        states.map((s) => s.price.toFixed(8)),
         states.map((s) => s.source),
         states.map(() => new Date(now).toISOString()),
       ],
@@ -206,7 +227,10 @@ export class MarketDataService implements OnModuleInit, OnModuleDestroy {
   private async updateMarks(states: PriceState[]): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
       for (const state of states) {
-        const price = Number(state.price.toFixed(4));
+        // Assez de décimales pour le forex et les petites cryptos, sans perdre
+        // la précision des gros prix.
+        const decimals = Math.max(4, assetDecimals(state.symbol));
+        const price = Number(state.price.toFixed(decimals));
         if (!(price > 0)) continue;
         await manager.query('select pg_advisory_xact_lock(hashtext($1), hashtext($2))', [
           ADVISORY_NAMESPACE,
@@ -218,7 +242,7 @@ export class MarketDataService implements OnModuleInit, OnModuleDestroy {
            on conflict (symbol) do update
              set last_price = excluded.last_price,
                  updated_at = excluded.updated_at`,
-          [state.symbol, price.toFixed(4)],
+          [state.symbol, price.toFixed(decimals)],
         );
       }
     });
@@ -292,6 +316,7 @@ export class MarketDataService implements OnModuleInit, OnModuleDestroy {
    * Aucune requête SQL.
    */
   quotes(): MarketQuote[] {
+    const natives = new Set(MARKET_ASSETS.map((asset) => asset.symbol));
     return FEED_SPECS.map((spec) => {
       const asset = findMarketAsset(spec.symbol);
       const state = this.states.get(spec.symbol);
@@ -306,6 +331,8 @@ export class MarketDataService implements OnModuleInit, OnModuleDestroy {
         unit: asset?.unit ?? spec.symbol,
         category: asset?.category ?? 'stock',
         price,
+        decimals: assetDecimals(spec.symbol),
+        native: natives.has(spec.symbol),
         source: state?.source ?? 'simulated',
         updatedAt: new Date(buffer.at(-1)?.t ?? Date.now()).toISOString(),
         changePercent: base > 0 ? ((price - base) / base) * 100 : 0,
@@ -317,18 +344,21 @@ export class MarketDataService implements OnModuleInit, OnModuleDestroy {
 
   /**
    * Prix courant d'un seul actif géré par le moteur (utilisé par `/market/spot`
-   * pour les actifs du catalogue à prix mouvant).
-   * Retourne `null` si le symbole n'est pas dans le PriceBook.
+   * et `/game-room` pour les actifs du catalogue à prix mouvant).
+   * Accepte les alias (`btcusdt`, `ETHUSDT`) et retourne `null` hors moteur.
    */
   quoteFor(symbol: string): MarketQuote | null {
-    const spec = FEED_SPECS.find((s) => s.symbol === symbol);
-    if (!spec) return null;
-    return this.quotes().find((q) => q.symbol === symbol) ?? null;
+    const canonical = canonicalEngineSymbol(symbol);
+    if (!canonical) return null;
+    return this.quotes().find((q) => q.symbol === canonical) ?? null;
   }
 
   /** Courbe d'un actif sur une période, ramenée à 300 points au plus. */
   async history(symbol: string, range: HistoryRange) {
-    if (!findMarketAsset(symbol)) return { symbol, range, points: [], changePercent: 0 };
+    const canonical = canonicalEngineSymbol(symbol);
+    const engineSymbol = canonical ?? (findMarketAsset(symbol)?.symbol ?? null);
+    if (!engineSymbol) return { symbol, range, points: [], changePercent: 0 };
+    symbol = engineSymbol;
     const { windowMs, bucket } = HISTORY_RANGES[range];
     const since = new Date(Date.now() - windowMs);
     const rows = (await this.dataSource.query(

@@ -1,5 +1,9 @@
 
-import { formatPrice } from '../../data/roomAssets.js';
+import {
+  formatAmount,
+  formatChangePercent,
+  formatPrice,
+} from '../../data/roomAssets.js';
 
 const STATUS_LABELS = {
   waiting: { text: 'En attente', class: 'gr-status--waiting' },
@@ -34,7 +38,7 @@ export default function GrHeader({
   const referencePrice = market?.series?.[0]?.price ?? market?.price ?? 0;
   const price = market?.price ?? referencePrice;
   const priceChange = referencePrice ? price - referencePrice : 0;
-  const changePercent = referencePrice ? ((priceChange / referencePrice) * 100).toFixed(2) : '0.00';
+  const changePercent = referencePrice ? (priceChange / referencePrice) * 100 : 0;
   const isUp = priceChange >= 0;
 
   const historyStart = formatClock(room.historyStartAt);
@@ -74,7 +78,7 @@ export default function GrHeader({
                 {formatPrice(price, symbol)} {currency}
               </strong>
               <span className={`gr-change ${isUp ? 'is-up' : 'is-down'}`}>
-                {isUp ? '+' : ''}{priceChange.toFixed(2)} ({isUp ? '+' : ''}{changePercent}%)
+                {formatAmount(priceChange, symbol, { signed: true })} ({formatChangePercent(changePercent)})
               </span>
             </div>
             <small className="gr-metric__sub">

@@ -32,9 +32,11 @@ export class FinnhubFeed extends WsFeed {
     if (message.type !== 'trade' || !Array.isArray(message.data)) return [];
     const ticks: RealTick[] = [];
     for (const trade of message.data) {
-      const spec = this.specs.find((item) => item.providerSymbol === trade.s);
-      if (spec && typeof trade.p === 'number' && trade.p > 0) {
-        ticks.push({ symbol: spec.symbol, price: trade.p, at: Date.now() });
+      if (typeof trade.p !== 'number' || !(trade.p > 0)) continue;
+      for (const spec of this.specs) {
+        if (spec.providerSymbol === trade.s) {
+          ticks.push({ symbol: spec.symbol, price: trade.p, at: Date.now() });
+        }
       }
     }
     return ticks;

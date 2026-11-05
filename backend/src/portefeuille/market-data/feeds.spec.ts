@@ -4,6 +4,7 @@ import { FinnhubFeed } from './finnhub-feed.js';
 import { FEED_SPECS } from './market-feed-config.js';
 import type { RealTick } from './price-book.js';
 import type { SocketLike } from './ws-feed.js';
+import { YahooFeed, parseYahooChart, type FetchLike } from './yahoo-feed.js';
 
 class FakeSocket implements SocketLike {
   onopen: SocketLike['onopen'] = null;
@@ -49,7 +50,11 @@ describe('BinanceFeed', () => {
     sockets[0].onopen?.({});
     const request = JSON.parse(sockets[0].sent[0]);
     expect(request.method).toBe('SUBSCRIBE');
-    expect(request.params).toEqual(binanceSpecs.map((spec) => `${spec.providerSymbol}@trade`));
+    // BTC/USD et BTC/USDT partagent la même paire Binance : un seul abonnement.
+    expect(request.params).toEqual([
+      ...new Set(binanceSpecs.map((spec) => `${spec.providerSymbol}@trade`)),
+    ]);
+    expect(new Set(request.params).size).toBe(request.params.length);
     feed.stop();
   });
 
@@ -63,8 +68,10 @@ describe('BinanceFeed', () => {
     sockets[0].onmessage?.({
       data: JSON.stringify({ stream: 'paxgusdt@trade', data: { e: 'trade', s: 'PAXGUSDT', p: '2701.10' } }),
     });
+    // Un même trade BTCUSDT alimente les deux alias internes de la paire.
     expect(ticks.map((t) => [t.symbol, t.price])).toEqual([
       ['BTC/USD', 68123.5],
+      ['BTC/USDT', 68123.5],
       ['XAU/USD', 2701.1],
     ]);
     feed.stop();
@@ -120,5 +127,82 @@ describe('FinnhubFeed', () => {
     });
     expect(ticks.map((t) => [t.symbol, t.price])).toEqual([['AAPL', 231.2]]);
     feed.stop();
+  });
+});
+
+describe('YahooFeed', () => {
+  const specs = FEED_SPECS.filter((s) => s.provider === 'yahoo');
+  const chart = (price: number, seconds: number) => ({
+    chart: { result: [{ meta: { regularMarketPrice: price, regularMarketTime: seconds } }] },
+  });
+
+  it('lit le prix et l\'horodatage fournisseur de la Chart API', () => {
+    const seconds = Math.floor((Date.now() - 60_000) / 1000);
+    expect(parseYahooChart(chart(520.99, seconds))).toEqual({
+      price: 520.99,
+      quoteTime: seconds * 1000,
+    });
+    expect(parseYahooChart({ chart: { result: [] } })).toBeNull();
+    expect(parseYahooChart(chart(0, seconds))).toBeNull();
+    expect(parseYahooChart({ chart: { error: { description: 'Not found' } } })).toBeNull();
+  });
+
+  it('interroge chaque actif Yahoo et publie un tick par réponse valide', async () => {
+    const ticks: RealTick[] = [];
+    const urls: string[] = [];
+    const msft = specs.find((spec) => spec.symbol === 'MSFT')!;
+    const seconds = Math.floor((Date.now() - 30_000) / 1000);
+    const fetchImpl: FetchLike = async (url) => {
+      urls.push(url);
+      return { ok: true, status: 200, json: async () => chart(520.99, seconds) };
+    };
+
+    const feed = new YahooFeed([msft], (tick) => ticks.push(tick), fetchImpl, 60_000);
+    feed.start();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    feed.stop();
+
+    expect(urls[0]).toContain('/MSFT?');
+    expect(ticks).toEqual([{ symbol: 'MSFT', price: 520.99, at: seconds * 1000 }]);
+  });
+
+  it('ne publie rien quand le fournisseur répond en erreur', async () => {
+    const ticks: RealTick[] = [];
+    const msft = specs.find((spec) => spec.symbol === 'MSFT')!;
+    const fetchImpl: FetchLike = async () => ({ ok: false, status: 429, json: async () => ({}) });
+
+    const feed = new YahooFeed([msft], (tick) => ticks.push(tick), fetchImpl, 60_000);
+    feed.start();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    feed.stop();
+
+    expect(ticks).toEqual([]);
+  });
+
+  it('met un actif au repos après un HTTP 429 au lieu de le marteler', async () => {
+    const msft = specs.find((spec) => spec.symbol === 'MSFT')!;
+    const googl = specs.find((spec) => spec.symbol === 'GOOGL')!;
+    const calls: string[] = [];
+    const fetchImpl: FetchLike = async (url) => {
+      calls.push(url);
+      return url.includes('MSFT')
+        ? { ok: false, status: 429, json: async () => ({}) }
+        : {
+            ok: true,
+            status: 200,
+            json: async () => chart(280.03, Math.floor(Date.now() / 1000)),
+          };
+    };
+
+    const feed = new YahooFeed([msft, googl], () => {}, fetchImpl, 60_000);
+    feed.start();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(calls.filter((url) => url.includes('MSFT'))).toHaveLength(1);
+
+    // Le second tour ne réinterroge pas l'actif refusé, mais continue les autres.
+    await feed.poll();
+    feed.stop();
+    expect(calls.filter((url) => url.includes('MSFT'))).toHaveLength(1);
+    expect(calls.filter((url) => url.includes('GOOGL'))).toHaveLength(2);
   });
 });

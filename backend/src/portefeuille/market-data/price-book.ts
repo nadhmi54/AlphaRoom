@@ -55,8 +55,16 @@ export class PriceBook {
   recordReal(tick: RealTick): void {
     const state = this.states.get(tick.symbol);
     if (!state || !(tick.price > 0)) return;
+    const firstTick = state.lastRealPrice === null;
     state.lastRealPrice = tick.price;
     state.lastRealAt = tick.at;
+    // Le dernier prix réel sert d'ancre même s'il est différé (Yahoo hors
+    // séance, contrat à terme retardé) : la simulation de repli reste collée à
+    // la réalité au lieu de dériver sur une valeur de démonstration.
+    state.anchor = tick.price;
+    // Au premier tick, on recale aussi le prix courant : sinon un marché fermé
+    // resterait affiché autour du prix de démonstration pendant des heures.
+    if (firstTick) state.price = tick.price;
   }
 
   /** Avance d'un pas de temps et renvoie l'état de chaque actif. */

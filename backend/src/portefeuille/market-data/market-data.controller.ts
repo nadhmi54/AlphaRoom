@@ -4,12 +4,8 @@ import { TRADING_ROLES } from '../../users/user-role.enum.js';
 import { BinanceRestService } from './binance-rest.service.js';
 import { HistoryQueryDto, SearchQueryDto, SpotQueryDto } from './dto/history-query.dto.js';
 import { MarketDataService } from './market-data.service.js';
-import {
-  MARKET_ASSETS,
-  findMarketAsset,
-  normalizeSymbol,
-  searchInstruments,
-} from '../trading/market-assets.js';
+import { findMarketAsset, searchInstruments } from '../trading/market-assets.js';
+import { canonicalEngineSymbol } from './market-feed-config.js';
 
 @Auth(...TRADING_ROLES)
 @Controller('market')
@@ -19,8 +15,14 @@ export class MarketDataController {
     private readonly binanceRest: BinanceRestService,
   ) {}
 
-  /** Prix actuel de chaque actif + mini-courbe. Appelé toutes les secondes. */
-  @Get('quotes') quotes() {
+  /**
+   * Prix actuel de chaque actif + mini-courbe. Appelé toutes les secondes.
+   * Lecture ouverte à tous les rôles connectés : le Meneur de Jeu en a besoin
+   * pour afficher les cotations de référence dans le wizard Game Room.
+   */
+  @Get('quotes')
+  @Auth()
+  quotes() {
     return { quotes: this.market.quotes() };
   }
 
@@ -30,10 +32,10 @@ export class MarketDataController {
    * - Paire Binance arbitraire (ETHUSDT, SOLUSDT…) : klines via l'API REST Binance.
    */
   @Get('history') async history(@Query() query: HistoryQueryDto) {
-    const isEngineAsset = MARKET_ASSETS.some(
-      (asset) => normalizeSymbol(asset.symbol) === normalizeSymbol(query.symbol),
-    );
-    if (isEngineAsset) return this.market.history(query.symbol, query.range);
+    // Tout actif du registre moteur (natifs + catalogue + paires Game Room)
+    // partage le même historique que `/game-room`.
+    const engineSymbol = canonicalEngineSymbol(query.symbol);
+    if (engineSymbol) return this.market.history(engineSymbol, query.range);
 
     // Paire Binance arbitraire : on vérifie que le symbole ressemble à un symbole
     // Binance valide (lettres majuscules uniquement) avant de le transmettre.
@@ -63,27 +65,41 @@ export class MarketDataController {
         ? await this.binanceRest.search(query.q)
         : await this.binanceRest.popular();
       return {
-        results: hits.map((item) => ({
-          ...item,
-          symbol: item.displaySymbol,
-          market: 'crypto' as const,
-          source: 'live' as const,
-          unit: item.displaySymbol.split('/')[0],
-        })),
+        results: hits.map((item) => {
+          // Une paire suivie par le moteur (BTC/USDT, ETH/USDT, SOL/USDT…)
+          // renvoie la cotation partagée, pas un prix REST séparé.
+          const engine = this.market.quoteFor(item.displaySymbol);
+          return {
+            ...item,
+            symbol: engine?.symbol ?? item.displaySymbol,
+            displaySymbol: engine?.symbol ?? item.displaySymbol,
+            name: engine?.name ?? item.name,
+            price: engine?.price ?? item.price,
+            market: 'crypto' as const,
+            source: engine?.source ?? ('live' as const),
+            changePercent: engine?.changePercent ?? 0,
+            engine: Boolean(engine),
+            unit: item.displaySymbol.split('/')[0],
+          };
+        }),
       };
     }
 
-    return {
-      results: searchInstruments(query.market, query.q).map((asset) => ({
+    const results = searchInstruments(query.market, query.q).map((asset) => {
+      const engine = this.market.quoteFor(asset.symbol);
+      return {
         symbol: asset.symbol,
         displaySymbol: asset.symbol,
         name: asset.name,
         unit: asset.unit,
-        price: asset.price,
+        price: engine?.price ?? asset.price,
+        source: engine?.source ?? asset.source,
+        changePercent: engine?.changePercent ?? 0,
         market: asset.category,
-        source: asset.source,
-      })),
-    };
+        engine: Boolean(engine),
+      };
+    });
+    return { results };
   }
 
   /**
