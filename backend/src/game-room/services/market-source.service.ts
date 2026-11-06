@@ -5,7 +5,10 @@ import { Repository } from 'typeorm';
 import { GameRoom } from '../entities/game-room.entity.js';
 import { GameSnapshot } from '../entities/game-snapshot.entity.js';
 import { MarketDataService } from '../../portefeuille/market-data/market-data.service.js';
-import { findMarketAsset } from '../../portefeuille/trading/market-assets.js';
+import {
+  findMarketAsset,
+  roundAssetPrice,
+} from '../../portefeuille/trading/market-assets.js';
 import {
   calculateScenarioPrice,
   PANIC_TUESDAY_SCENARIO,
@@ -60,7 +63,7 @@ export interface CandlePoint {
   close: number;
 }
 
-interface DatasetPoint {
+export interface DatasetPoint {
   /** Secondes depuis le début du jeu de données. */
   offset: number;
   price: number;
@@ -152,8 +155,11 @@ export class MarketSourceService {
     const config = room.sourceConfig ?? {};
 
     const base = await this.resolveBasePrice(room, active, elapsed, config);
-    const price = round2(Math.max(0.000001, base.price + shocks.priceOffset));
-    const spread = round2(
+    // Précision propre à l'actif : un arrondi fixe à 2 décimales figeait EUR/USD,
+    // XAG/USD, NATGAS/USD et XRP/USDT (variation affichée à 0,00 %).
+    const price = roundAssetPrice(active, Math.max(0.000001, base.price + shocks.priceOffset));
+    const spread = roundAssetPrice(
+      active,
       Math.max(0.000001, base.spread * Number(room.spreadMultiplier ?? 1) * shocks.spreadMultiplier),
     );
 
@@ -189,10 +195,13 @@ export class MarketSourceService {
       case 'historical': {
         const dataset = await this.loadHistoricalDataset(room, symbol);
         if (dataset.points.length >= 2) {
+          const total = totalSimSeconds(room);
+          const synCfg = this.syntheticConfig(symbol, config);
+          const price = interpolateOrContinue(dataset.points, elapsed, total, synCfg);
           return {
-            price: interpolate(dataset.points, elapsed),
-            spread: spreadFromPrice(symbol, interpolate(dataset.points, elapsed)),
-            source: 'historical',
+            price,
+            spread: spreadFromPrice(symbol, price),
+            source: elapsed > dataset.spanSeconds ? 'synthetic' : 'historical',
           };
         }
         const fallback = syntheticPrice(elapsed, totalSimSeconds(room), this.syntheticConfig(symbol, config));
@@ -201,15 +210,28 @@ export class MarketSourceService {
       case 'csv': {
         const points = csvPoints(config.candles);
         if (points.length >= 2) {
-          const price = interpolate(points, elapsed);
-          return { price, spread: spreadFromPrice(symbol, price), source: 'csv' };
+          const total = totalSimSeconds(room);
+          const synCfg = this.syntheticConfig(symbol, config);
+          const price = interpolateOrContinue(points, elapsed, total, synCfg);
+          const dataSpan = points[points.length - 1].offset;
+          return {
+            price,
+            spread: spreadFromPrice(symbol, price),
+            source: elapsed > dataSpan ? 'synthetic' : 'csv',
+          };
         }
         const fallback = syntheticPrice(elapsed, totalSimSeconds(room), this.syntheticConfig(symbol, config));
         return { price: fallback, spread: spreadFromPrice(symbol, fallback), source: 'synthetic' };
       }
       case 'live': {
-        const price = await this.livePrice(room, symbol, elapsed);
-        return { price, spread: spreadFromPrice(symbol, price), source: 'live' };
+        const live = await this.livePrice(room, symbol, elapsed);
+        return {
+          price: live.price,
+          spread: spreadFromPrice(symbol, live.price),
+          // Si le flux réel n'a pas de tick frais, le moteur renvoie un prix
+          // simulé autour du dernier tick : on ne le présente pas comme live.
+          source: live.source,
+        };
       }
       case 'scenario':
       default: {
@@ -225,25 +247,55 @@ export class MarketSourceService {
       initialPrice:
         config.initialPrice && config.initialPrice > 0
           ? config.initialPrice
-          : (findMarketAsset(symbol)?.price ?? PANIC_TUESDAY_SCENARIO.initialPrice),
+          : this.referencePrice(symbol),
     };
+  }
+
+  /**
+   * Ancre réelle d'un actif de salle. Le moteur de prix est prioritaire (dernier
+   * prix live ou simulé autour du dernier tick réel), puis le prix bootstrap du
+   * catalogue. Aucune table de prix statique spécifique à la Game Room.
+   */
+  private referencePrice(symbol: string): number {
+    const engine = this.marketData.quoteFor(symbol);
+    if (engine && engine.price > 0) return engine.price;
+    const known = findMarketAsset(symbol)?.price;
+    if (known && known > 0) return known;
+    return PANIC_TUESDAY_SCENARIO.initialPrice;
   }
 
   /**
    * Prix live partagé : le premier appelant d'un intervalle de 2 secondes enregistre
    * le prix du flux, les suivants relisent la même valeur (index unique partiel).
    */
-  private async livePrice(room: GameRoom, symbol: string, elapsed: number): Promise<number> {
+  private async livePrice(
+    room: GameRoom,
+    symbol: string,
+    elapsed: number,
+  ): Promise<{ price: number; source: 'live' | 'synthetic' }> {
     const bucket = Math.floor(elapsed / LIVE_BUCKET_SECONDS) * LIVE_BUCKET_SECONDS;
     const stored = await this.readLiveSnapshot(room.id, bucket, symbol);
-    if (stored !== null) return stored;
+    if (stored !== null) {
+      // Le snapshot partagé ne stocke que le prix ; la provenance est relue
+      // dans le moteur (toujours la même source de vérité).
+      const current = this.marketData.quoteFor(symbol);
+      return { price: stored, source: current?.source === 'live' ? 'live' : 'synthetic' };
+    }
 
-    const quote = this.marketData.quotes().find((item) => item.symbol === symbol);
-    const price = round2(quote?.price ?? findMarketAsset(symbol)?.price ?? 0);
+    const quote = this.marketData.quoteFor(symbol);
+    const price = roundAssetPrice(symbol, quote?.price ?? findMarketAsset(symbol)?.price ?? 0);
     if (price <= 0) {
       this.logger.warn(`Aucun prix disponible pour ${symbol} : repli sur le marché synthétique.`);
-      return syntheticPrice(elapsed, totalSimSeconds(room), this.syntheticConfig(symbol, room.sourceConfig ?? {}));
+      return {
+        price: syntheticPrice(
+          elapsed,
+          totalSimSeconds(room),
+          this.syntheticConfig(symbol, room.sourceConfig ?? {}),
+        ),
+        source: 'synthetic',
+      };
     }
+    const source: 'live' | 'synthetic' = quote?.source === 'live' ? 'live' : 'synthetic';
 
     await this.dataSource.query(
       `insert into public.game_snapshots (room_id, sim_elapsed_seconds, state)
@@ -256,14 +308,14 @@ export class MarketSourceService {
           kind: 'live_price',
           symbol,
           price,
-          source: quote?.source ?? 'live',
+          source,
           recordedAt: new Date().toISOString(),
         }),
       ],
     );
 
     const winner = await this.readLiveSnapshot(room.id, bucket, symbol);
-    return winner ?? price;
+    return { price: winner ?? price, source };
   }
 
   private async readLiveSnapshot(roomId: string, bucket: number, symbol: string): Promise<number | null> {
@@ -353,7 +405,10 @@ export class MarketSourceService {
     const series: SeriesPoint[] = [];
     for (let i = 0; i < points; i++) {
       const t = Math.round(i * step);
-      series.push({ t, price: round2(Math.max(0.000001, sample(t) + shocks.priceOffset)) });
+      series.push({
+        t,
+        price: roundAssetPrice(symbol, Math.max(0.000001, sample(t) + shocks.priceOffset)),
+      });
     }
     const current = await this.getMarketState(room, symbol);
     if (series.at(-1)?.t !== current.elapsedSeconds) {
@@ -371,7 +426,8 @@ export class MarketSourceService {
   ): Promise<CandlePoint[]> {
     const sample = await this.sampler(room, symbol);
     const shocks = this.getShocks(room.id);
-    const at = (t: number) => round2(Math.max(0.000001, sample(t) + shocks.priceOffset));
+    const at = (t: number) =>
+      roundAssetPrice(symbol, Math.max(0.000001, sample(t) + shocks.priceOffset));
     const bucket = TIMEFRAME_SECONDS[(timeframe ?? room.timeframe) as GameRoomTimeframe] ?? 60;
     const candles: CandlePoint[] = [];
     const lastBucket = Math.floor(elapsed / bucket);
@@ -414,11 +470,19 @@ export class MarketSourceService {
         return synthetic;
       case 'historical': {
         const dataset = await this.loadHistoricalDataset(room, symbol);
-        return dataset.points.length >= 2 ? (t) => interpolate(dataset.points, t) : synthetic;
+        if (dataset.points.length >= 2) {
+          const synCfg = this.syntheticConfig(symbol, config);
+          return (t) => interpolateOrContinue(dataset.points, t, total, synCfg);
+        }
+        return synthetic;
       }
       case 'csv': {
         const points = csvPoints(config.candles);
-        return points.length >= 2 ? (t) => interpolate(points, t) : synthetic;
+        if (points.length >= 2) {
+          const synCfg = this.syntheticConfig(symbol, config);
+          return (t) => interpolateOrContinue(points, t, total, synCfg);
+        }
+        return synthetic;
       }
       case 'live': {
         const points = await this.loadLivePoints(room.id, symbol);
@@ -468,10 +532,6 @@ function clamp(value: number, max: number): number {
   return Math.max(0, Math.min(Math.round(value), max));
 }
 
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
-}
-
 function datasetKey(roomId: string, symbol: string): string {
   return `${roomId}:${symbol}`;
 }
@@ -499,6 +559,31 @@ export function interpolate(points: DatasetPoint[], elapsed: number): number {
   const b = points[high];
   const span = b.offset - a.offset || 1;
   return a.price + ((b.price - a.price) * (elapsed - a.offset)) / span;
+}
+
+/**
+ * Interpolation avec continuation synthétique : si le dataset est plus court
+ * que la durée totale de simulation, on continue à partir du dernier prix connu
+ * avec le modèle synthétique (bruit FBM + drift) au lieu de répéter le dernier prix.
+ */
+export function interpolateOrContinue(
+  points: DatasetPoint[],
+  elapsed: number,
+  totalSim: number,
+  config: MarketSourceConfig = {},
+): number {
+  if (points.length === 0) return 0;
+  if (points.length === 1) return points[0].price;
+  const last = points[points.length - 1];
+  if (elapsed <= last.offset) {
+    return interpolate(points, elapsed);
+  }
+  const remaining = Math.max(1, totalSim - last.offset);
+  const over = elapsed - last.offset;
+  return syntheticPrice(over, remaining, {
+    ...config,
+    initialPrice: last.price,
+  });
 }
 
 /** Convertit les bougies CSV en série indexée en secondes depuis la première bougie. */

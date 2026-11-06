@@ -27,9 +27,37 @@ export interface BinanceKline {
   price: number; // prix de clôture
 }
 
+/** Paires mises en avant quand la recherche crypto est vide. */
+const POPULAR = [
+  'BTCUSDT',
+  'ETHUSDT',
+  'BNBUSDT',
+  'SOLUSDT',
+  'XRPUSDT',
+  'ADAUSDT',
+  'DOGEUSDT',
+  'AVAXUSDT',
+  'LINKUSDT',
+  'DOTUSDT',
+] as const;
+
 @Injectable()
 export class BinanceRestService {
   private readonly logger = new Logger(BinanceRestService.name);
+  private priceCache: { at: number; rows: Array<{ symbol: string; price: string }> } | null = null;
+
+  /** Toutes les paires et leurs prix, avec un cache court (10 s). */
+  private async allPrices(): Promise<Array<{ symbol: string; price: string }>> {
+    if (this.priceCache && Date.now() - this.priceCache.at < 10_000) {
+      return this.priceCache.rows;
+    }
+    const rows = (await this.fetch('/api/v3/ticker/price')) as Array<{
+      symbol: string;
+      price: string;
+    }>;
+    this.priceCache = { at: Date.now(), rows };
+    return rows;
+  }
 
   /** Récupère le prix spot d'un symbole Binance (ex. ETHUSDT). Retourne null si inconnu. */
   async getPrice(binanceSymbol: string): Promise<number | null> {
@@ -51,8 +79,7 @@ export class BinanceRestService {
     const q = query.toUpperCase().trim();
     if (!q) return [];
     try {
-      // /api/v3/ticker/24hr retourne toutes les paires avec prix — on le met en cache
-      const rows = await this.fetch('/api/v3/ticker/price') as Array<{ symbol: string; price: string }>;
+      const rows = await this.allPrices();
       return rows
         .filter((row) => row.symbol.endsWith('USDT') && row.symbol.startsWith(q))
         .slice(0, limit)
@@ -64,6 +91,26 @@ export class BinanceRestService {
         }));
     } catch (error) {
       this.logger.warn(`Recherche Binance échouée pour "${query}": ${String(error)}`);
+      return [];
+    }
+  }
+
+  /** Paires populaires avec leur prix, pour les suggestions à vide. */
+  async popular(limit = 10): Promise<BinanceTicker[]> {
+    try {
+      const rows = await this.allPrices();
+      const prices = new Map(rows.map((row) => [row.symbol, Number(row.price)]));
+      return POPULAR.map((symbol) => ({ symbol, price: prices.get(symbol) ?? 0 }))
+        .filter((row) => row.price > 0)
+        .slice(0, limit)
+        .map((row) => ({
+          binanceSymbol: row.symbol,
+          displaySymbol: this.toDisplay(row.symbol),
+          name: this.toName(row.symbol),
+          price: row.price,
+        }));
+    } catch (error) {
+      this.logger.warn(`Suggestions Binance indisponibles : ${String(error)}`);
       return [];
     }
   }

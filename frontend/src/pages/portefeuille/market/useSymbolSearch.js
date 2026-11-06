@@ -4,39 +4,40 @@ import { searchSymbols } from "../../../services/marketService.js";
 const DEBOUNCE_MS = 300;
 
 /**
- * Recherche de paires Binance avec debounce.
- * Retourne les résultats de recherche et l'état de chargement.
+ * Recherche d'actifs dans le marché choisi, avec debounce.
+ * Une requête vide renvoie les suggestions du marché (paires populaires pour
+ * la crypto, catalogue pour les actions / matières premières / devises).
  */
-export default function useSymbolSearch() {
+export default function useSymbolSearch(market = "crypto") {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const timer = useRef(null);
-  const latest = useRef("");
+  const latest = useRef({ query: "", market });
 
   const search = useCallback((q) => {
     setQuery(q);
     if (timer.current) clearTimeout(timer.current);
-    if (!q.trim()) {
-      setResults([]);
-      setSearching(false);
-      return;
-    }
     setSearching(true);
+    const requestMarket = market;
     timer.current = setTimeout(async () => {
-      latest.current = q;
+      latest.current = { query: q, market: requestMarket };
       try {
-        const { results: hits } = await searchSymbols(q.trim());
-        // Ignorer si une autre recherche a déjà été lancée entre-temps
-        if (latest.current !== q) return;
+        const { results: hits } = await searchSymbols(q.trim(), requestMarket);
+        // Ignorer si le marché ou la requête a changé entre-temps.
+        if (latest.current.query !== q || latest.current.market !== requestMarket) return;
         setResults(hits);
       } catch {
-        setResults([]);
+        if (latest.current.query === q && latest.current.market === requestMarket) {
+          setResults([]);
+        }
       } finally {
-        if (latest.current === q) setSearching(false);
+        if (latest.current.query === q && latest.current.market === requestMarket) {
+          setSearching(false);
+        }
       }
     }, DEBOUNCE_MS);
-  }, []);
+  }, [market]);
 
   const reset = useCallback(() => {
     setQuery("");
@@ -44,6 +45,11 @@ export default function useSymbolSearch() {
     setSearching(false);
     if (timer.current) clearTimeout(timer.current);
   }, []);
+
+  // Changer de marché vide la recherche et annule les résultats précédents.
+  useEffect(() => {
+    reset();
+  }, [market, reset]);
 
   // Nettoyage au démontage
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);

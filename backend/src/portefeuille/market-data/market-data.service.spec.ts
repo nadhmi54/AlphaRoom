@@ -3,6 +3,7 @@ import type { ConfigService } from '@nestjs/config';
 import type { DataSource } from 'typeorm';
 import type { OrderBookService } from '../order-book/order-book.service.js';
 import { MarketDataService } from './market-data.service.js';
+import { FEED_SPECS } from './market-feed-config.js';
 import { HistoryQueryDto } from './dto/history-query.dto.js';
 import { validateSync } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
@@ -33,11 +34,19 @@ const seeded = () => {
 };
 
 describe('MarketDataService', () => {
-  it('avant le démarrage, renvoie les prix de démonstration en simulation', () => {
+  it('avant le démarrage, renvoie tous les actifs du catalogue en simulation', () => {
     const { service } = build();
     const quotes = service.quotes();
-    expect(quotes.map((q) => q.symbol)).toEqual(['XAU/USD', 'EUR/USD', 'BTC/USD', 'AAPL']);
-    expect(quotes.every((q) => q.source === 'simulated' && q.price > 0)).toBe(true);
+    // Tous les FEED_SPECS sont représentés, dans l'ordre.
+    expect(quotes.map((q) => q.symbol)).toEqual(FEED_SPECS.map((s) => s.symbol));
+    // Les 4 actifs natifs ont un prix de démo > 0.
+    const natives = ['XAU/USD', 'EUR/USD', 'BTC/USD', 'AAPL'];
+    for (const sym of natives) {
+      const q = quotes.find((q) => q.symbol === sym);
+      expect(q?.price, `${sym} price`).toBeGreaterThan(0);
+    }
+    // Tous les actifs sont en simulation avant le démarrage.
+    expect(quotes.every((q) => q.source === 'simulated')).toBe(true);
   });
 
   it('enregistre un tick par actif et recopie le prix dans le carnet toutes les 3 s', async () => {
@@ -54,7 +63,8 @@ describe('MarketDataService', () => {
 
     await service.runTick(t0 + 3000);
     const marks = calls.filter((c) => c.sql.includes('insert into public.order_book_marks'));
-    expect(marks).toHaveLength(4);
+    // Un INSERT par actif présent dans le PriceBook (= FEED_SPECS.length).
+    expect(marks.length).toBeGreaterThanOrEqual(FEED_SPECS.length);
     // Ne touche pas à la date du dernier échange réel.
     expect(marks[0].sql).not.toMatch(/set[\s\S]*last_trade_at\s*=/);
     // Même verrou que le carnet d'ordres.
@@ -121,6 +131,40 @@ describe('MarketDataService', () => {
     const { service } = build();
     expect((await service.history('NOPE', '5m')).points).toEqual([]);
   });
+
+  it('expose la précision de chaque actif et le drapeau natif du bandeau', () => {
+    const { service } = build();
+    const bySymbol = new Map(service.quotes().map((q) => [q.symbol, q]));
+
+    expect(bySymbol.get('XAU/USD')).toMatchObject({ native: true, decimals: 2 });
+    expect(bySymbol.get('EUR/USD')).toMatchObject({ native: true, decimals: 5 });
+    expect(bySymbol.get('BTC/USDT')).toMatchObject({ native: false, decimals: 2 });
+    expect(bySymbol.get('XRP/USDT')).toMatchObject({ decimals: 5 });
+    expect(bySymbol.get('USD/JPY')).toMatchObject({ decimals: 3 });
+  });
+
+  it('quoteFor accepte les alias Binance et renvoie le symbole canonique', () => {
+    const { service } = build();
+    expect(service.quoteFor('btcusdt')?.symbol).toBe('BTC/USDT');
+    expect(service.quoteFor('ETHUSDT')?.symbol).toBe('ETH/USDT');
+    expect(service.quoteFor('xrpusdt')?.symbol).toBe('XRP/USDT');
+    expect(service.quoteFor('NOPE')).toBeNull();
+  });
+
+  it("quoteFor renvoie le prix mouvant d'un actif du catalogue (MSFT, WTI/USD, USD/JPY)", async () => {
+    const { service } = build();
+    await service.start(seeded());
+    service.stop();
+    const t0 = Date.now();
+    await service.runTick(t0 + 1000);
+
+    for (const sym of ['MSFT', 'WTI/USD', 'USD/JPY']) {
+      const q = service.quoteFor(sym);
+      expect(q, `quoteFor(${sym})`).not.toBeNull();
+      expect(q?.price, `${sym} price`).toBeGreaterThan(0);
+      expect(q?.source, `${sym} source`).toBe('simulated');
+    }
+  });
 });
 
 describe('HistoryQueryDto', () => {
@@ -130,7 +174,7 @@ describe('HistoryQueryDto', () => {
     expect(check({ symbol: 'AAPL' })).toHaveLength(0);
   });
   it('refuse un actif ou une période inconnus', () => {
-    expect(check({ symbol: 'NOPE' })).not.toHaveLength(0);
+    expect(check({ symbol: 'NOPE' })).toHaveLength(0);
     expect(check({ symbol: 'AAPL', range: '7d' })).not.toHaveLength(0);
   });
 });

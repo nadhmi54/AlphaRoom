@@ -2,12 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   DURATION_CHOICES,
   HISTORY_RANGE_CHOICES,
-  ROOM_ASSETS,
   SOURCE_MODES,
   TIMEFRAME_CHOICES,
   findRoomAsset,
+  formatPrice,
 } from '../../data/roomAssets.js';
 import { createGameRoom, previewCsv } from '../../services/gameRoomService.js';
+import { getQuotes } from '../../services/marketService.js';
+import GrAssetPicker from './GrAssetPicker.jsx';
 
 const STEPS = [
   { id: 1, label: 'Salle' },
@@ -63,31 +65,97 @@ export default function GrCreateRoomModal({ onClose, onCreated }) {
   const [time, setTime] = useState({ durationMinutes: 30, timeframe: '1m', playbackSpeed: '' });
 
   const [csv, setCsv] = useState({ filename: '', content: '', preview: null, loading: false, error: '' });
+  // Cotations du moteur, indexées par symbole. Elles remplacent les prix de
+  // démonstration du catalogue dans tout le wizard (sélecteur + prix initial).
+  const [quotes, setQuotes] = useState({});
 
   const primarySymbol = settings.assets.includes(source.symbol) ? source.symbol : settings.assets[0];
   const primaryAsset = findRoomAsset(primarySymbol);
+  const quoteFor = (symbol) => quotes[symbol]?.price ?? null;
+  const primaryPrice = quoteFor(primarySymbol);
+
+  // La cotation peut arriver après l'ouverture du wizard : on complète alors le
+  // prix initial synthétique resté vide, sans écraser une valeur saisie.
+  useEffect(() => {
+    if (source.mode !== 'synthetic' || source.initialPrice) return;
+    const live = quotes[primarySymbol]?.price ?? null;
+    if (live == null) return;
+    setSource((prev) =>
+      prev.initialPrice ? prev : { ...prev, initialPrice: String(live) },
+    );
+  }, [source.mode, source.initialPrice, primarySymbol, quotes]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const { quotes: list } = await getQuotes();
+        if (cancelled || !Array.isArray(list)) return;
+        const bySymbol = {};
+        for (const quote of list) bySymbol[quote.symbol] = quote;
+        setQuotes(bySymbol);
+      } catch {
+        // Le wizard reste utilisable : le prix initial devra être saisi à la main.
+      }
+    };
+    load();
+    const timer = window.setInterval(load, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   const setSettingsField = (key, value) => setSettings((prev) => ({ ...prev, [key]: value }));
 
-  // Le prix de référence de l'actif est pré-rempli en marché synthétique.
+  // Le prix initial du marché synthétique est pré-rempli avec la cotation du
+  // moteur (jamais avec le prix de démonstration statique du catalogue).
   const selectMode = (mode) => {
-    setSource((prev) => ({
-      ...prev,
-      mode,
-      initialPrice:
-        mode === 'synthetic' && !prev.initialPrice
-          ? String(findRoomAsset(settings.assets.includes(prev.symbol) ? prev.symbol : settings.assets[0]).price)
-          : prev.initialPrice,
-    }));
+    setSource((prev) => {
+      const symbol = settings.assets.includes(prev.symbol) ? prev.symbol : settings.assets[0];
+      const live = quoteFor(symbol);
+      return {
+        ...prev,
+        mode,
+        initialPrice:
+          mode === 'synthetic' && !prev.initialPrice && live != null
+            ? String(live)
+            : prev.initialPrice,
+      };
+    });
   };
   const setSourceField = (key, value) => setSource((prev) => ({ ...prev, [key]: value }));
+
+  // Changer d'actif suivi met aussi à jour le prix initial du marché synthétique,
+  // sinon la salle partirait sur la cotation de l'actif précédent.
+  const selectSourceSymbol = (symbol) => {
+    setSource((prev) => {
+      const live = quoteFor(symbol);
+      return {
+        ...prev,
+        symbol,
+        ...(prev.mode === 'synthetic'
+          ? { initialPrice: live != null ? String(live) : '' }
+          : {}),
+      };
+    });
+  };
 
   const toggleAsset = (symbol) => {
     setSettings((prev) => {
       const has = prev.assets.includes(symbol);
       if (has && prev.assets.length === 1) return prev;
       const assets = has ? prev.assets.filter((s) => s !== symbol) : [...prev.assets, symbol];
-      if (has && source.symbol === symbol) setSource((s) => ({ ...s, symbol: assets[0] }));
+      if (has && source.symbol === symbol) {
+        const live = quoteFor(assets[0]);
+        setSource((s) => ({
+          ...s,
+          symbol: assets[0],
+          ...(s.mode === 'synthetic'
+            ? { initialPrice: live != null ? String(live) : '' }
+            : {}),
+        }));
+      }
       return { ...prev, assets };
     });
   };
@@ -158,8 +226,8 @@ export default function GrCreateRoomModal({ onClose, onCreated }) {
     if (step === 2 && source.mode === 'csv' && !csv.preview?.valid) {
       return csv.error || 'Importez et validez un fichier CSV contenant au moins deux bougies.';
     }
-    if (step === 2 && source.mode === 'synthetic' && num(source.initialPrice, primaryAsset.price) <= 0) {
-      return 'Le prix initial du marché synthétique doit être supérieur à 0.';
+    if (step === 2 && source.mode === 'synthetic' && num(source.initialPrice, primaryPrice) <= 0) {
+      return 'Le prix initial du marché synthétique doit être supérieur à 0 (cotation indisponible : saisissez-le).';
     }
     return '';
   };
@@ -186,7 +254,7 @@ export default function GrCreateRoomModal({ onClose, onCreated }) {
     const sourcePayload = { mode: source.mode };
     if (source.mode !== 'scenario') sourcePayload.symbol = primarySymbol;
     if (source.mode === 'synthetic') {
-      sourcePayload.initialPrice = num(source.initialPrice, primaryAsset.price);
+      sourcePayload.initialPrice = num(source.initialPrice, primaryPrice);
       sourcePayload.volatilityPercent = num(source.volatilityPercent, 3);
       sourcePayload.trendPercent = num(source.trendPercent, 0);
       sourcePayload.seed = num(source.seed, 20261101);
@@ -321,20 +389,10 @@ export default function GrCreateRoomModal({ onClose, onCreated }) {
 
               <div className="gr-field">
                 <span className="gr-field__label">Actifs négociables * ({settings.assets.length} sélectionné{settings.assets.length > 1 ? 's' : ''})</span>
-                <div className="gr-asset-picker">
-                  {ROOM_ASSETS.map((asset) => (
-                    <button
-                      key={asset.symbol}
-                      type="button"
-                      className={`gr-asset-chip ${settings.assets.includes(asset.symbol) ? 'is-active' : ''}`}
-                      onClick={() => toggleAsset(asset.symbol)}
-                      title={`${asset.name} — unité : ${asset.unit}`}
-                    >
-                      <strong>{asset.symbol}</strong>
-                      <small>{asset.name}</small>
-                    </button>
-                  ))}
-                </div>
+                <GrAssetPicker assets={settings.assets} onToggle={toggleAsset} quotes={quotes} />
+                <small className="gr-wizard__hint">
+                  Choisis un marché puis cherche l’actif : le nombre d’actifs négociables est libre.
+                </small>
               </div>
 
               <div className="gr-field-grid">
@@ -402,7 +460,7 @@ export default function GrCreateRoomModal({ onClose, onCreated }) {
                     id="sourceSymbol"
                     className="gr-input"
                     value={primarySymbol}
-                    onChange={(e) => setSourceField('symbol', e.target.value)}
+                    onChange={(e) => selectSourceSymbol(e.target.value)}
                   >
                     {settings.assets.map((symbol) => (
                       <option key={symbol} value={symbol}>{symbol} — {findRoomAsset(symbol).name}</option>
@@ -429,10 +487,15 @@ export default function GrCreateRoomModal({ onClose, onCreated }) {
                         step="0.0001"
                         min="0.0001"
                         className="gr-input"
-                        placeholder={String(primaryAsset.price)}
+                        placeholder={primaryPrice != null ? String(primaryPrice) : 'Cotation indisponible'}
                         value={source.initialPrice}
                         onChange={(e) => setSourceField('initialPrice', e.target.value)}
                       />
+                      <small className="gr-wizard__hint">
+                        {primaryPrice != null
+                          ? `Cotation moteur : ${formatPrice(primaryPrice, primarySymbol)} $ · flux ${quotes[primarySymbol]?.source ?? 'simulé'}`
+                          : 'Aucune cotation reçue pour cet actif : saisissez un prix initial.'}
+                      </small>
                     </div>
                     <div className="gr-field">
                       <label htmlFor="synthVol">Volatilité (%)</label>

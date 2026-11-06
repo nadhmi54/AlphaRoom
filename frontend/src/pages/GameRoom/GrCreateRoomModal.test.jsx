@@ -1,25 +1,47 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import GrCreateRoomModal from './GrCreateRoomModal.jsx';
 import { createGameRoom, previewCsv } from '../../services/gameRoomService.js';
+import { getQuotes } from '../../services/marketService.js';
 
 vi.mock('../../services/gameRoomService.js', () => ({
   createGameRoom: vi.fn().mockResolvedValue({ id: 'room-1', name: 'Séance krach', joinCode: 'KRAK01' }),
   previewCsv: vi.fn(),
 }));
 
+// Le wizard lit les cotations du moteur : aucun prix statique n'est pré-rempli.
+vi.mock('../../services/marketService.js', () => ({ getQuotes: vi.fn() }));
+
 const clickNext = () => fireEvent.click(screen.getByRole('button', { name: /Continuer/i }));
+
+/** Monte le wizard et laisse arriver la première cotation du moteur. */
+const renderModal = async (props = {}) => {
+  const result = render(
+    <GrCreateRoomModal onClose={vi.fn()} onCreated={vi.fn()} {...props} />,
+  );
+  await act(async () => {
+    await Promise.resolve();
+  });
+  return result;
+};
 
 describe('GrCreateRoomModal', () => {
   beforeEach(() => {
     createGameRoom.mockClear();
     previewCsv.mockClear();
+    getQuotes.mockReset();
+    getQuotes.mockResolvedValue({
+      quotes: [
+        { symbol: 'XAU/USD', price: 2700.5, source: 'live', native: true },
+        { symbol: 'BTC/USD', price: 68000, source: 'live', native: true },
+      ],
+    });
   });
 
   it('refuse de créer une salle sans nom', async () => {
-    render(<GrCreateRoomModal onClose={vi.fn()} onCreated={vi.fn()} />);
+    await renderModal();
 
     clickNext();
 
@@ -29,13 +51,14 @@ describe('GrCreateRoomModal', () => {
 
   it('crée une salle en marché synthétique avec la configuration complète', async () => {
     const onCreated = vi.fn();
-    render(<GrCreateRoomModal onClose={vi.fn()} onCreated={onCreated} />);
+    await renderModal({ onCreated });
 
     fireEvent.change(screen.getByLabelText(/Nom de la salle/i), {
       target: { value: 'Séance krach' },
     });
     // Deux actifs négociables + capital personnalisé
-    fireEvent.click(screen.getByRole('button', { name: /BTC\/USD/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Crypto/i }));
+    fireEvent.click(screen.getByRole('button', { name: /BTC\/USD Bitcoin/i }));
     fireEvent.change(screen.getByLabelText(/Capital initial/i), { target: { value: '50000' } });
 
     clickNext();
@@ -79,7 +102,8 @@ describe('GrCreateRoomModal', () => {
       source: {
         mode: 'synthetic',
         symbol: 'XAU/USD',
-        initialPrice: 2685.4,
+        // Cotation du moteur, pas le prix statique du catalogue (2685.4).
+        initialPrice: 2700.5,
         volatilityPercent: 6,
         trendPercent: -4,
         seed: 20261101,
@@ -91,7 +115,7 @@ describe('GrCreateRoomModal', () => {
   });
 
   it('calcule automatiquement la vitesse de relecture des données historiques', async () => {
-    render(<GrCreateRoomModal onClose={vi.fn()} onCreated={vi.fn()} />);
+    await renderModal();
 
     fireEvent.change(screen.getByLabelText(/Nom de la salle/i), { target: { value: 'Replay 24 h' } });
     clickNext();
@@ -106,7 +130,7 @@ describe('GrCreateRoomModal', () => {
   });
 
   it('bloque le mode CSV tant que le fichier n’a pas été validé par le serveur', async () => {
-    render(<GrCreateRoomModal onClose={vi.fn()} onCreated={vi.fn()} />);
+    await renderModal();
 
     fireEvent.change(screen.getByLabelText(/Nom de la salle/i), { target: { value: 'Import CSV' } });
     clickNext();
@@ -117,8 +141,8 @@ describe('GrCreateRoomModal', () => {
     expect(createGameRoom).not.toHaveBeenCalled();
   });
 
-  it('neutralise Entrée partout : la création ne part que d’un clic sur le bouton', () => {
-    render(<GrCreateRoomModal onClose={vi.fn()} onCreated={vi.fn()} />);
+  it('neutralise Entrée partout : la création ne part que d’un clic sur le bouton', async () => {
+    await renderModal();
 
     fireEvent.change(screen.getByLabelText(/Nom de la salle/i), { target: { value: 'Salle Entrée' } });
     clickNext();
@@ -137,7 +161,7 @@ describe('GrCreateRoomModal', () => {
   });
 
   it('absorbe le double-clic sur Continuer : créer reste inactif 500 ms à l’étape 4', async () => {
-    render(<GrCreateRoomModal onClose={vi.fn()} onCreated={vi.fn()} />);
+    await renderModal();
 
     fireEvent.change(screen.getByLabelText(/Nom de la salle/i), { target: { value: 'Double clic' } });
     clickNext();

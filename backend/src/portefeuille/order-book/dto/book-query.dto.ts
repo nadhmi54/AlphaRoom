@@ -1,12 +1,9 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
-import { MARKET_ASSETS } from '../../trading/market-assets.js';
-
-const SYMBOLS = MARKET_ASSETS.map((asset) => asset.symbol);
+import { IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class BookQueryDto {
   @IsString()
-  @IsIn(SYMBOLS)
+  @MaxLength(20)
   symbol!: string;
 
   @IsOptional()

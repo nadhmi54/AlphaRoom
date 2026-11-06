@@ -21,22 +21,25 @@ export class BinanceFeed extends WsFeed {
    * ne peut ainsi pas faire refuser la connexion des autres actifs.
    */
   protected onOpen(send: (message: unknown) => void): void {
-    send({
-      method: 'SUBSCRIBE',
-      params: this.specs.map((spec) => `${spec.providerSymbol}@trade`),
-      id: 1,
-    });
+    // Plusieurs symboles internes peuvent partager une même paire Binance
+    // (BTC/USD et BTC/USDT) : on déduplique l'abonnement pour ne pas recevoir
+    // deux fois le même trade.
+    const params = [...new Set(this.specs.map((spec) => `${spec.providerSymbol}@trade`))];
+    send({ method: 'SUBSCRIBE', params, id: 1 });
   }
 
   protected parse(raw: string): RealTick[] {
     const message = JSON.parse(raw) as { data?: { s?: string; p?: string; T?: number } };
     const trade = message.data;
     if (!trade?.s || !trade.p) return [];
-    const spec = this.specs.find((item) => item.providerSymbol === trade.s?.toLowerCase());
     const price = Number(trade.p);
-    if (!spec || !(price > 0)) return [];
-    // L'instant de réception sert de référence : il évite de dépendre de
-    // l'horloge de Binance pour décider si le prix est « frais ».
-    return [{ symbol: spec.symbol, price, at: Date.now() }];
+    if (!(price > 0)) return [];
+    const providerSymbol = trade.s.toLowerCase();
+    // Un même flux peut alimenter plusieurs alias internes (BTC/USD, BTC/USDT).
+    return this.specs
+      .filter((spec) => spec.providerSymbol === providerSymbol)
+      // L'instant de réception sert de référence : il évite de dépendre de
+      // l'horloge de Binance pour décider si le prix est « frais ».
+      .map((spec) => ({ symbol: spec.symbol, price, at: Date.now() }));
   }
 }

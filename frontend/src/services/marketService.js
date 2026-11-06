@@ -8,9 +8,10 @@ export const getQuotes = () => apiFetch("/market/quotes");
 export const getHistory = (symbol, range = "5m") =>
   apiFetch("/market/history", { query: { symbol, range } });
 
-// Recherche de paires Binance par préfixe (ex. "ETH" → ETHUSDT, ETHBTC…).
-export const searchSymbols = (q) =>
-  apiFetch("/market/search", { query: { q } });
+// Recherche d'actifs dans un marché : "crypto" (Binance) ou
+// "stock" | "commodity" | "forex" (catalogue local côté backend).
+export const searchSymbols = (q, market = "crypto") =>
+  apiFetch("/market/search", { query: { q, market } });
 
 // Prix spot en temps réel d'une paire Binance arbitraire (ex. ETHUSDT).
 export const getSpotPrice = (symbol) =>

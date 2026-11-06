@@ -1,13 +1,11 @@
 import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
-import { FEED_SPECS, HISTORY_RANGES, type HistoryRange } from '../market-feed-config.js';
-
-const VALID_SYMBOLS = FEED_SPECS.map((s) => s.symbol);
+import { HISTORY_RANGES, type HistoryRange } from '../market-feed-config.js';
+import { ASSET_CATEGORIES, type AssetCategory } from '../../trading/market-assets.js';
 
 export class HistoryQueryDto {
-  /** Symbole interne (XAU/USD, BTC/USD…). */
+  /** Symbole de l'actif à historiser (n'importe quel symbole accepté). */
   @IsString()
   @MaxLength(20)
-  @IsIn(VALID_SYMBOLS)
   symbol!: string;
 
   @IsOptional()
@@ -15,11 +13,15 @@ export class HistoryQueryDto {
   range: HistoryRange = '5m';
 }
 
-/** DTO pour la recherche d'actifs. */
+/** DTO pour la recherche d'actifs, éventuellement limitée à un marché. */
 export class SearchQueryDto {
   @IsString()
   @MaxLength(20)
   q!: string;
+
+  @IsOptional()
+  @IsIn(ASSET_CATEGORIES)
+  market: AssetCategory = 'crypto';
 }
 
 /** DTO pour le prix spot d'un seul symbole Binance. */

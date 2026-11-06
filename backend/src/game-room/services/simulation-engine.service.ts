@@ -15,6 +15,7 @@ import {
   totalSimSeconds,
   type MarketState,
 } from './market-source.service.js';
+import { assetDecimals } from '../../portefeuille/trading/market-assets.js';
 
 export interface SimBookLevel {
   price: number;
@@ -84,7 +85,7 @@ export class SimulationEngineService {
    */
   async getOrderBook(room: GameRoom, symbol?: string): Promise<SimOrderBookView> {
     const state = await this.marketSource.getMarketState(room, symbol);
-    const decimals = decimalsFor(state.symbol);
+    const decimals = assetDecimals(state.symbol);
     const halfSpread = state.spread / 2;
     const bestBid = Number((state.price - halfSpread).toFixed(decimals));
     const bestAsk = Number((state.price + halfSpread).toFixed(decimals));
@@ -175,7 +176,7 @@ export class SimulationEngineService {
     }
 
     const config = readRoomConfig(room);
-    const decimals = decimalsFor(symbol);
+    const decimals = assetDecimals(symbol);
     const state = await this.marketSource.getMarketState(room, symbol);
     const book = await this.getOrderBook(room, symbol);
 
@@ -445,7 +446,7 @@ export class SimulationEngineService {
         ord.status = 'filled';
         ord.filledQuantity = ord.quantity;
         ord.remainingQuantity = '0';
-        ord.averagePrice = currentPrice.toFixed(decimalsFor(ord.symbol));
+        ord.averagePrice = currentPrice.toFixed(assetDecimals(ord.symbol));
         await this.orders.save(ord);
       } catch (err) {
         this.logger.error(`Erreur déclenchement ordre limite ${ord.id}:`, err);
@@ -833,12 +834,6 @@ export function recomputeTotalSimSeconds(room: GameRoom): number {
   const durationMinutes = Number(room.durationMinutes) || 30;
   if (room.sourceMode === 'live') return durationMinutes * 60;
   return Math.round(durationMinutes * 60 * playbackSpeed(room));
-}
-
-function decimalsFor(symbol: string): number {
-  if (symbol.startsWith('EUR')) return 5;
-  if (symbol.startsWith('BTC')) return 2;
-  return 2;
 }
 
 function round2(value: number): number {

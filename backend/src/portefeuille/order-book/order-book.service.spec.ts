@@ -1,14 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DataSource } from 'typeorm';
+import type { BinanceRestService } from '../market-data/binance-rest.service.js';
 import type { TradingService } from '../trading/trading.service.js';
 import { OrderBookService } from './order-book.service.js';
+
+const binance = { getPrice: vi.fn(async () => null) } as unknown as BinanceRestService;
 
 describe('OrderBookService protections', () => {
   it('ferme la position quand le cours atteint son stop-loss', async () => {
     const query = vi.fn(async () => [
       { ownerId: 'user-stop', quantity: '2.000000', stopLoss: '90.0000', takeProfit: null },
     ]);
-    const service = new OrderBookService({ query } as unknown as DataSource, {} as TradingService);
+    const service = new OrderBookService({ query } as unknown as DataSource, {} as TradingService, binance);
     const close = vi.spyOn(service, 'closePosition').mockResolvedValue({} as never);
 
     await service.checkProtections('AAPL', 90);
@@ -20,7 +23,7 @@ describe('OrderBookService protections', () => {
     const query = vi.fn(async () => [
       { ownerId: 'user-profit', quantity: '2.000000', stopLoss: null, takeProfit: '120.0000' },
     ]);
-    const service = new OrderBookService({ query } as unknown as DataSource, {} as TradingService);
+    const service = new OrderBookService({ query } as unknown as DataSource, {} as TradingService, binance);
     const close = vi.spyOn(service, 'closePosition').mockResolvedValue({} as never);
 
     await service.checkProtections('AAPL', 120);
@@ -30,7 +33,7 @@ describe('OrderBookService protections', () => {
 
   it('ne déclenche pas de fermeture si la requête ne trouve aucun seuil atteint', async () => {
     const query = vi.fn(async () => []);
-    const service = new OrderBookService({ query } as unknown as DataSource, {} as TradingService);
+    const service = new OrderBookService({ query } as unknown as DataSource, {} as TradingService, binance);
     const close = vi.spyOn(service, 'closePosition').mockResolvedValue({} as never);
 
     await service.checkProtections('AAPL', 100);

@@ -62,9 +62,17 @@ function describeResult(result, unit) {
  * l'ordre rapide (QuickTrade).
  */
 export default function OrderBookPanel({ symbol, assets = [], onSymbolChange, onExecuted }) {
-  const asset = assets.find((item) => item.symbol === symbol);
-  const unit = asset?.unit ?? "unités";
   const { book, orders, error, loading, lastSync, refresh } = useOrderBook(symbol);
+  const asset = assets.find((item) => item.symbol === symbol);
+  const unit = asset?.unit ?? book?.unit ?? "unités";
+
+  // La liste des actifs peut ne pas encore contenir la paire découverte via la
+  // recherche Binance : on l'ajoute pour que le sélecteur affiche toujours
+  // l'actif courant au lieu d'une valeur vide.
+  const assetOptions = useMemo(() => {
+    if (!symbol || assets.some((item) => item.symbol === symbol)) return assets;
+    return [{ symbol, name: book?.name ?? symbol, unit }, ...assets];
+  }, [assets, symbol, book, unit]);
   const [side, setSide] = useState("buy");
   const [quantity, setQuantity] = useState("1");
   const [limitPrice, setLimitPrice] = useState("");
@@ -228,10 +236,10 @@ export default function OrderBookPanel({ symbol, assets = [], onSymbolChange, on
                 <select
                   id="ob-asset"
                   value={symbol}
-                  disabled={!assets.length}
+                  disabled={!assetOptions.length}
                   onChange={(event) => onSymbolChange?.(event.target.value)}
                 >
-                  {assets.map((item) => (
+                  {assetOptions.map((item) => (
                     <option key={item.symbol} value={item.symbol}>
                       {item.name} · {item.symbol}
                     </option>

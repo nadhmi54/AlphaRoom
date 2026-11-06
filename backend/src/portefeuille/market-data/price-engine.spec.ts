@@ -90,6 +90,17 @@ describe('PriceBook', () => {
     });
   });
 
+  it('recale le prix affiché sur le premier tick réel, même différé', () => {
+    const book = new PriceBook(FEED_SPECS, initial, seeded(5));
+    // AAPL est initialisé avec le prix de démonstration : un tick réel daté
+    // (marché fermé) doit immédiatement remplacer cette valeur, pas seulement
+    // servir d'ancre lointaine.
+    book.recordReal({ symbol: 'AAPL', price: 331.9, at: 0 });
+    const state = book.step(60 * 60_000, 1).find((s) => s.symbol === 'AAPL');
+    expect(state?.source).toBe('simulated');
+    expect(Math.abs((state?.price ?? 0) - 331.9)).toBeLessThan(2);
+  });
+
   it('ignore les prix invalides et les symboles inconnus', () => {
     const book = new PriceBook(FEED_SPECS, initial, seeded(1));
     book.recordReal({ symbol: 'BTC/USD', price: -5, at: 1 });

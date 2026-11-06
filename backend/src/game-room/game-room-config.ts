@@ -1,4 +1,4 @@
-import { PANIC_TUESDAY_SCENARIO } from './scenario/panic-tuesday.scenario.js';
+﻿import { PANIC_TUESDAY_SCENARIO } from './scenario/panic-tuesday.scenario.js';
 
 /** Actifs négociables : symboles internes de la plateforme (cf. market-assets.ts). */
 export type RoomAssets = string[];
@@ -247,6 +247,11 @@ export function syntheticPrice(
 export function naturalSpreadPercent(symbol: string): number {
   if (symbol.startsWith('BTC')) return 0.05;
   if (symbol.startsWith('EUR')) return 0.01;
-  if (symbol === 'AAPL') return 0.03;
-  return 0.012; // XAU/USD et défaut
+  if (symbol.includes('JPY')) return 0.012;
+  if (symbol === 'AAPL' || symbol === 'MSFT' || symbol === 'GOOGL' ||
+      symbol === 'AMZN' || symbol === 'TSLA' || symbol === 'NVDA' || symbol === 'META') return 0.03;
+  if (symbol === 'WTI/USD' || symbol === 'BRENT/USD') return 0.02;
+  if (symbol === 'NATGAS/USD') return 0.04;
+  if (symbol === 'XAG/USD' || symbol === 'COPPER/USD') return 0.025;
+  return 0.012; // XAU/USD et défaut forex/crypto
 }

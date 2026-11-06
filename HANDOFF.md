@@ -1,0 +1,124 @@
+# HANDOFF — AlphaRoom
+
+Dernière mise à jour : étape 2 terminée (carnet multi-marchés).
+
+## Commandes utiles
+
+```powershell
+cd backend
+npm run build
+npm run lint
+npm test
+
+cd ../frontend
+npm run build
+npm run lint
+npm test
+```
+
+## Ce qui est fait
+
+### Étape 1 — Réparation du registre d'actifs (commit `47ecb65`)
+
+- `backend/src/portefeuille/trading/market-assets.ts` réécrit proprement :
+  - `findMarketAsset()` ne lève plus d'erreur de syntaxe ;
+  - `TRADABLE_ASSETS` existe réellement et chaque actif porte un champ `source` ;
+  - normalisation des symboles : `BNBUSDT`, `bnb_usdt`, `BNB/USDT` → `BNB/USDT` ;
+  - `resolveMarketAsset()` ne lève jamais pour un actif inconnu : il renvoie
+    `price: 0` + `source: 'unpriced'` (aucun prix inventé) ;
+  - `MARKET_ASSETS` (XAU/USD, EUR/USD, BTC/USD, AAPL) reste la base des actifs natifs.
+- `backend/src/portefeuille/order-book/order-book.service.ts` reconverti de
+  UTF-16 (fichier binaire pour Git/TypeScript) en UTF-8.
+- Backend : build OK, 442 tests existants OK.
+
+### Étape 2 — `ensureLiquidity()` et achat/vente multi-marchés
+
+- `BinanceRestModule` créé (`market-data/binance-rest.module.ts`) et partagé par
+  `MarketDataModule` + `OrderBookModule` (pas de dépendance circulaire).
+- `OrderBookService` :
+  - injecte `BinanceRestService` ;
+  - `referencePrice()` résout un prix **réel** dans cet ordre :
+    1. `order_book_marks` (dernier prix exécuté / mark du moteur) ;
+    2. prix de démonstration des actifs natifs ;
+    3. ticker REST Binance (cache mémoire 15 s) ;
+    4. dernière exécution dans `trade_executions` ;
+  - si aucun prix n'existe : `BadRequestException` française explicite
+    « Aucune donnée de prix disponible pour … » (plus de retour silencieux) ;
+  - `ensureLiquidity()` retourne le prix de référence et reconstruit la grille :
+    - conserve les niveaux système encore valides (même partiellement exécutés),
+    - **annule** (`cancelled`) les niveaux obsolètes au lieu de les supprimer
+      (les exécutions peuvent y faire référence),
+    - insère les niveaux manquants en **une seule** requête batch,
+    - tout reste dans la transaction / le verrou consultatif par symbole ;
+  - `placeOrder()` et `getBook()` normalisent le symbole une seule fois
+    (`BNBUSDT` → `BNB/USDT`) pour ne pas fragmenter carnet et positions ;
+  - `this.asset()` ne lève plus pour un symbole inconnu.
+- `TradingService` :
+  - `getAssets()` renvoie les actifs natifs + tout symbole déjà négocié (mark) ;
+  - `getQuote()` utilise `resolveMarketAsset()` et renvoie une erreur française
+    claire si aucun prix n'est disponible ;
+  - une position sans mark est valorisée au prix d'achat moyen (jamais 0).
+- Frontend :
+  - la recherche Binance sélectionne le symbole canonique `BNB/USDT`
+    (au lieu de `BNBUSDT`) : carnet, positions et graphique partagent la même clé ;
+  - `OrderBookPanel` ajoute l'actif courant au sélecteur et utilise l'unité du
+    carnet en repli ;
+  - `TransactionHistory` reçoit la liste complète des actifs via `/trading/assets` ;
+  - `useLiveMarket` ne garde plus la cotation du symbole précédent et affiche
+    une erreur française si le prix custom échoue ;
+  - `roomAssets.js` : plus de repli silencieux sur l'or pour un actif inconnu
+    (métadonnées neutres, prix 0), et `formatPrice()` n'affiche jamais `0,00`.
+- Tests ajoutés :
+  - `order-book.markets.spec.ts` (23 tests) : carnet bids/asks/spread/lastPrice
+    > 0 et BUY+SELL pour ETH, BNB, BTC, SOL, XRP, XAU/USD, EUR/USD, AAPL ;
+    normalisation/changement de symbole ; repli sur le dernier prix exécuté ;
+    absence de prix → erreur française ; solde insuffisant ; quantité
+    nulle/négative ; vente supérieure à la position ; annulation (pas
+    suppression) des niveaux système obsolètes.
+  - `market-assets.spec.ts` (5 tests) : normalisation, `source`, actif inconnu
+    sans prix.
+
+Résultats : backend build OK, lint OK (2 warnings préexistants), **470 tests OK** ;
+frontend build OK, lint OK, **118 tests OK**.
+
+Nettoyage du code mort (exports inutilisés, branche morte, doublons `quoteView`/`appendPoint`, `hasUsablePrice`) : build/lint/tests inchangés.
+
+### Étape 3 — Quatre marchés (crypto, actions, matières premières, devises)
+
+- Backend : catalogue `CATALOG_ASSETS` (MSFT, GOOGL, AMZN, TSLA, NVDA, META,
+  XAG/USD, WTI/USD, BRENT/USD, NATGAS/USD, COPPER/USD, GBP/USD, USD/JPY,
+  USD/CHF, AUD/USD, USD/CAD) avec prix de démonstration fixes, enregistré dans
+  `TRADABLE_ASSETS` : carnet, positions et ordre rapide fonctionnent.
+- `searchInstruments(category, query)` filtre par nom ou symbole, sans accents
+  (« petrole » trouve « Pétrole ») ; requête vide = suggestions du marché.
+- `GET /market/search?market=…&q=…` : crypto via Binance (ou paires populaires à
+  vide), autres marchés via le catalogue. `GET /market/spot` renvoie le prix du
+  catalogue pour ces symboles. L'historique moteur reste réservé aux 4 natifs.
+- Frontend : rail des 4 marchés à gauche de la barre de recherche, placeholder et
+  suggestions adaptés au marché choisi, onglet synchronisé avec la catégorie de
+  l'actif sélectionné ; mise en page responsive (rail horizontal < 1100 px).
+- Résultats : backend build/lint OK, **484 tests OK** ; frontend build/lint OK,
+  **120 tests OK** (dont les 4 boutons de marché et les placeholders).
+
+## Ce qui reste à vérifier / faire
+
+1. **Vérification en conditions réelles** : redémarrer le backend puis tester
+   dans l'interface un achat puis une vente sur BNB, ETH, SOL, XRP (recherche
+   Binance) et vérifier le carnet affiché. Les tests unitaires simulent Binance.
+2. `market-data.service.ts` `quotes()` : vérifié, il ne renvoie que les actifs
+   suivis par le moteur (les 4 natifs) avec `source` réel ; les paires custom
+   passent par `/market/spot`. Aucun faux `live` sur un prix statique.
+3. Optionnel : ajouter un test frontend pour le filtre `TransactionHistory` et
+   la sélection `BNB/USDT` ; les tests frontend existants passent.
+4. Nettoyage effectué : les 8 fichiers `.txt` de debug du commit WIP ont été
+   supprimés (`backend/_allisin.txt`, `backend/_unavailable.txt`,
+   `backend/_symbols4.txt`, `backend/verify.txt`, `frontend/_symbols4.txt`,
+   `temp_order.txt`, `test.txt`, `test2.txt`) — aucun n'était référencé.
+
+## Prochaine action exacte
+
+Redémarrer le backend (`cd backend; npm run start:dev`) et, dans `/marche`,
+vérifier les 4 marchés : Crypto → BNB/USDT, Actions → MSFT, Matières premières →
+WTI/USD, Devises → GBP/USD. Rechercher, vérifier le carnet, puis acheter et
+revendre. Si un cas échoue, ajouter le scénario correspondant dans
+`backend/src/portefeuille/order-book/order-book.markets.spec.ts`.

@@ -22,9 +22,9 @@ const quote = (symbol, name, price, extra = {}) => ({
 
 const makeMarket = (overrides = {}) => ({
   quotes: [
-    quote("XAU/USD", "Or", 2690.5, { source: "simulated", changePercent: -0.2 }),
-    quote("BTC/USD", "Bitcoin", 68000),
-    quote("EUR/USD", "Euro/Dollar", 1.08345),
+    quote("XAU/USD", "Or", 2690.5, { source: "simulated", changePercent: -0.2, category: "commodity" }),
+    quote("BTC/USD", "Bitcoin", 68000, { category: "crypto" }),
+    quote("EUR/USD", "Euro/Dollar", 1.08345, { category: "forex" }),
   ],
   series: [
     { t: Date.parse("2026-10-25T10:00:00Z"), price: 67900 },
@@ -82,6 +82,47 @@ describe("LiveMarketPanel", () => {
     // directement le champ de recherche (le seul point d'entrée sans cartes).
     // On vérifie simplement que le handler est bien passé en prop.
     expect(onSymbolChange).toBeDefined();
+  });
+
+  it("propose les quatre marchés et adapte la barre de recherche", () => {
+    setup();
+    const crypto = screen.getByRole("button", { name: "Crypto" });
+    const stocks = screen.getByRole("button", { name: "Actions" });
+    const commodities = screen.getByRole("button", { name: "Matières premières" });
+    const forex = screen.getByRole("button", { name: "Devises" });
+
+    expect(crypto).toHaveAttribute("aria-pressed", "true");
+    expect(stocks).toBeInTheDocument();
+    expect(commodities).toBeInTheDocument();
+    expect(forex).toBeInTheDocument();
+
+    fireEvent.click(stocks);
+    expect(stocks).toHaveAttribute("aria-pressed", "true");
+    expect(crypto).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("textbox")).toHaveAttribute(
+      "placeholder",
+      "Rechercher une action… (AAPL, MSFT, TSLA…)",
+    );
+
+    fireEvent.click(commodities);
+    expect(screen.getByRole("textbox")).toHaveAttribute(
+      "placeholder",
+      "Rechercher une matière première… (or, pétrole…)",
+    );
+
+    fireEvent.click(forex);
+    expect(screen.getByRole("textbox")).toHaveAttribute(
+      "placeholder",
+      "Rechercher une devise… (EUR/USD, GBP/USD…)",
+    );
+  });
+
+  it("ouvre le marché de l'actif sélectionné", () => {
+    setup({ symbol: "XAU/USD" });
+    expect(screen.getByRole("button", { name: "Matières premières" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
   });
 
   it("change de période", () => {

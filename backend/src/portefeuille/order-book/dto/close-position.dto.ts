@@ -1,9 +1,8 @@
-import { IsIn, IsString, IsUUID } from 'class-validator';
-import { MARKET_ASSETS } from '../../trading/market-assets.js';
+import { IsString, IsUUID, MaxLength } from 'class-validator';
 
 export class ClosePositionDto {
   @IsString()
-  @IsIn(MARKET_ASSETS.map((asset) => asset.symbol))
+  @MaxLength(20)
   symbol!: string;
 
   @IsUUID()
