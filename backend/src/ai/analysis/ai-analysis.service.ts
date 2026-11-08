@@ -1,7 +1,8 @@
-import { BadRequestException, ForbiddenException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import type { Profile } from '../../users/profile.entity.js';
+import type { SessionData } from '../contract/session-data.js';
 import { SESSION_DATA_PROVIDER, type SessionDataProvider } from '../contract/session-data-provider.js';
 import { LLM_PROVIDER, type LlmProvider } from '../llm/llm-provider.js';
 import { AiUsage, type UsagePurpose } from '../storage/ai-usage.entity.js';
@@ -26,7 +27,23 @@ export class AiAnalysisService {
 
   async market(profile: Profile, dto: MarketAnalysisDto) {
     this.requireTeacher(profile);
+    return this.marketOf(profile, dto, await loadSession(this.sessions, dto.sessionId, dto.run));
+  }
+
+  /**
+   * Lecture du marché ouverte aux participants de la séance : elle ne contient
+   * que des prix, des événements et des comptes (« 3 participants sur 5 »),
+   * jamais de noms ni d'ordres individuels.
+   */
+  async marketForParticipant(profile: Profile, dto: MarketAnalysisDto) {
     const session = await loadSession(this.sessions, dto.sessionId, dto.run);
+    if (!isTeacher(profile) && !session.participants.some((p) => p.id === profile.id)) {
+      throw new NotFoundException('Tu ne participes pas à cette séance.');
+    }
+    return this.marketOf(profile, dto, session);
+  }
+
+  private async marketOf(profile: Profile, dto: MarketAnalysisDto, session: SessionData) {
     const analysis = analyzeMarket(session);
     const narration = await narrate(this.llm, 'marché', analysis, session.durationMinutes);
     await this.record(profile, 'market_analysis', dto.sessionId, dto.run, narration);

@@ -6,6 +6,7 @@ import { ProfileGuard, type AuthenticatedRequest } from '../users/profile.guard.
 import type { Profile } from '../users/profile.entity.js';
 import { GameRoomController } from './game-room.controller.js';
 import { GameRoomAiService } from './services/game-room-ai.service.js';
+import { RunSnapshotService } from './services/run-snapshot.service.js';
 import { GameRoomService } from './services/game-room.service.js';
 import { SimulationEngineService } from './services/simulation-engine.service.js';
 
@@ -90,6 +91,7 @@ beforeAll(async () => {
         },
       },
       { provide: GameRoomAiService, useValue: {} },
+      { provide: RunSnapshotService, useValue: { archiveCurrentRun: async () => null } },
     ],
   })
     .overrideGuard(SupabaseJwtGuard)

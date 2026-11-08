@@ -14,6 +14,7 @@ import type { Profile } from '../users/profile.entity.js';
 import { GameRoomService } from './services/game-room.service.js';
 import { SimulationEngineService } from './services/simulation-engine.service.js';
 import { GameRoomAiService } from './services/game-room-ai.service.js';
+import { RunSnapshotService } from './services/run-snapshot.service.js';
 import {
   ClosePositionDto,
   CreateGameRoomDto,
@@ -33,6 +34,7 @@ export class GameRoomController {
     private readonly roomService: GameRoomService,
     private readonly simEngine: SimulationEngineService,
     private readonly aiService: GameRoomAiService,
+    private readonly runSnapshots: RunSnapshotService,
   ) {}
 
   /** Salle de démonstration "Le mardi de la panique" accessible immédiatement. */
@@ -202,6 +204,8 @@ export class GameRoomController {
   ) {
     const room = await this.roomService.rooms.findOne({ where: { id: roomId } });
     if (!room) throw new Error('Salle introuvable');
+    // Le rollback supprime les exécutions postérieures : on garde le passage actuel pour le module IA (replay).
+    if (body.type === 'ROLLBACK') await this.runSnapshots.archiveCurrentRun(room);
     return this.simEngine.applyGameMasterAction(room, body);
   }
 
@@ -216,7 +220,7 @@ export class GameRoomController {
   @Get(':roomId/ai/analyst')
   @Auth()
   async getAiMarketAnalysis(@CurrentProfile() profile: Profile, @Param('roomId') roomId: string) {
-    return this.aiService.getMarketAnalysis(roomId, profile.id);
+    return this.aiService.getMarketAnalysis(roomId, profile);
   }
 
   /** IA Trading Coach : Question-réponse pédagogique individualisée. */
@@ -227,13 +231,13 @@ export class GameRoomController {
     @Param('roomId') roomId: string,
     @Body() body: { question: string },
   ) {
-    return this.aiService.askTradingCoach(roomId, profile.id, body.question);
+    return this.aiService.askTradingCoach(roomId, profile, body.question);
   }
 
   /** IA Performance Evaluator : Bilan pédagogique et notation de la séance. */
   @Get(':roomId/ai/eval')
   @Auth()
   async getAiEvaluation(@CurrentProfile() profile: Profile, @Param('roomId') roomId: string) {
-    return this.aiService.evaluateStudentPerformance(roomId, profile.id);
+    return this.aiService.evaluateStudentPerformance(roomId, profile);
   }
 }

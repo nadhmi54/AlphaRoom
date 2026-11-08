@@ -7,6 +7,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   Max,
   MaxLength,
@@ -17,11 +18,21 @@ import {
 export class CoachHistoryItemDto {
   @IsIn(['user', 'assistant']) role!: 'user' | 'assistant';
 
-  @IsString() @MaxLength(1500) content!: string;
+  @IsString() @MaxLength(8000) content!: string;
+}
+
+export class RenameConversationDto {
+  @IsString() @IsNotEmpty() @MaxLength(120) title!: string;
 }
 
 export class AskCoachDto {
-  @IsString() @IsNotEmpty() @MaxLength(1000) question!: string;
+  @IsString() @IsNotEmpty() @MaxLength(2000) question!: string;
+
+  /**
+   * Discussion à poursuivre : le serveur relit lui-même son historique (le champ `history` est alors ignoré).
+   * Absent : une nouvelle discussion est créée et son identifiant est renvoyé.
+   */
+  @IsOptional() @IsUUID() conversationId?: string;
 
   /** Absent : la première séance à laquelle la personne participe. */
   @IsOptional() @IsString() @MaxLength(100) sessionId?: string;
@@ -34,7 +45,7 @@ export class AskCoachDto {
 
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(10)
+  @ArrayMaxSize(40)
   @ValidateNested({ each: true })
   @Type(() => CoachHistoryItemDto)
   history?: CoachHistoryItemDto[];
