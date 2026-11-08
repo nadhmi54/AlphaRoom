@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import CoachWidget from "../../../components/CoachWidget/CoachWidget.jsx";
 import ModuleShell from "../../../components/ModuleShell/ModuleShell.jsx";
 import { ApiError } from "../../../services/apiClient.js";
 import {
@@ -363,7 +362,6 @@ export default function M1MarchePage() {
         </p>
       </section>
       <Toasts toasts={toasts} onDismiss={dismissToast} />
-      <CoachWidget />
     </ModuleShell>
   );
 }

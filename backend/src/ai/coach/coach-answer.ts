@@ -62,9 +62,9 @@ export function buildRuleAnswer(context: ParticipantContext, question: string): 
       intent,
       evidence: [],
       text:
-        'Je ne peux pas te dire quoi acheter ou vendre, ni prévoir l’évolution des prix : je suis là pour t’aider à comprendre. ' +
-        'Pour décider toi-même, regarde ton exposition (quelle part de ton capital est investie), ta protection (as-tu un stop-loss ?) ' +
-        'et la réaction du marché aux événements. Pose-moi une question sur l’un de ces points et je te l’explique avec tes propres chiffres.',
+        'Je ne peux pas te donner d’avis argumenté pour l’instant (le modèle d’IA n’est pas disponible ou pas configuré) : réessaie dans un instant. ' +
+        'En attendant, regarde ton exposition (quelle part de ton capital est investie), ta protection (as-tu un stop-loss ?) ' +
+        'et la réaction du marché aux événements : la décision de vendre ou de garder passe par là.',
     };
   }
 

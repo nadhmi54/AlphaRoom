@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Profile } from '../../users/profile.entity.js';
 import { UserRole } from '../../users/user-role.enum.js';
 import { createDemoProvider } from '../demo/demo-provider.js';
-import { LlmError, type LlmProvider, type LlmRequest } from '../llm/llm-provider.js';
+import { LlmError, type LlmProvider, type LlmRequest, type ToolRequest, type ToolResponse } from '../llm/llm-provider.js';
 import { StubLlmProvider } from '../llm/stub-llm-provider.js';
 import type { AiUsage } from '../storage/ai-usage.entity.js';
 import { AiCoachService } from './ai-coach.service.js';
@@ -156,9 +156,128 @@ describe('Trading Coach', () => {
 
   it('limite le nombre de questions par minute', async () => {
     const { service } = build();
-    for (let i = 0; i < 6; i += 1) await service.ask(amine, { question: 'bonjour', run: 1 });
+    for (let i = 0; i < 20; i += 1) await service.ask(amine, { question: 'bonjour', run: 1 });
     const error = await service.ask(amine, { question: 'bonjour', run: 1 }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(HttpException);
     expect((error as HttpException).getStatus()).toBe(429);
+  });
+});
+
+/** Faux modèle « agent » : une suite de tours (outils puis texte). */
+function fakeAgentLlm(turns: Array<{ text?: string; tools?: string[] }>, legacy?: string): LlmProvider & { toolRequests: ToolRequest[] } {
+  const toolRequests: ToolRequest[] = [];
+  let i = 0;
+  return {
+    name: 'fake',
+    toolRequests,
+    async generate() {
+      if (legacy === undefined) throw new LlmError('HTTP 400', 400);
+      return { text: legacy, model: 'fake-1', usage: { inputTokens: 50, outputTokens: 10 } };
+    },
+    async generateWithTools(request): Promise<ToolResponse> {
+      toolRequests.push(structuredClone(request));
+      const turn = turns[Math.min(i, turns.length - 1)]!;
+      i += 1;
+      return {
+        text: turn.text ?? '',
+        toolCalls: (turn.tools ?? []).map((name, n) => ({ id: `c${i}${n}`, name, arguments: '{}' })),
+        model: 'fake-1',
+        usage: { inputTokens: 100, outputTokens: 20 },
+      };
+    },
+  };
+}
+
+describe('Trading Coach · mode agent', () => {
+  it('le modèle consulte les outils puis répond : source llm, outils indiqués, consommation cumulée', async () => {
+    const llm = fakeAgentLlm([{ tools: ['get_portfolio'] }, { text: 'Ton exposition maximale a atteint 91,8 % de ton capital. Que se passe-t-il si le prix baisse ?' }]);
+    const { service, usage } = build(llm);
+    const reply = await service.ask(amine, { question: 'Mon risque est-il élevé ?', run: 1 });
+    expect(reply).toMatchObject({ source: 'llm', agent: true, toolsUsed: ['get_portfolio'] });
+    expect(reply.answer).toContain('91,8 %');
+    expect(usage.rows).toEqual([expect.objectContaining({ purpose: 'coach', inputTokens: 200, outputTokens: 40 })]);
+  });
+
+  it('les outils portent sur l’étudiant qui interroge, jamais sur un autre', async () => {
+    const llm = fakeAgentLlm([{ tools: ['get_trades'] }, { text: 'Voici tes ordres.' }]);
+    const { service } = build(llm);
+    await service.ask(amine, { question: 'Montre mes ordres', run: 1 });
+    const toolMessage = llm.toolRequests[1]!.messages.find((m) => m.role === 'tool');
+    expect(toolMessage).toBeDefined();
+    expect(JSON.stringify(llm.toolRequests)).not.toContain('user-sarra');
+  });
+
+  it('chiffre non vérifié : la réponse du modèle est gardée, avec une note, jamais remplacée par un texte écrit d’avance', async () => {
+    const llm = fakeAgentLlm([{ text: 'Tu as perdu 47 % de ton capital.' }], 'inutilisé');
+    const { service } = build(llm);
+    const reply = await service.ask(amine, { question: 'Pourquoi ai-je perdu ?', run: 1 });
+    expect(reply).toMatchObject({ source: 'llm', agent: true, unverified: ['47 %'] });
+    expect(reply.answer).toContain('47 %');
+  });
+
+  it('peut donner un avis de trading argumenté', async () => {
+    const llm = fakeAgentLlm([{ text: 'À ta place, je réduirais la position avant la prochaine news : le risque est concentré. Qu’en penses-tu ?' }]);
+    const { service } = build(llm);
+    const reply = await service.ask(amine, { question: 'Je fais quoi avec ma position ?', run: 1 });
+    expect(reply).toMatchObject({ source: 'llm', agent: true });
+    expect(reply.unverified).toBeUndefined();
+    expect(reply.answer).toContain('je réduirais');
+  });
+
+  it('fournisseur qui refuse les outils (erreur 400) : le chemin classique répond quand même', async () => {
+    const llm = fakeAgentLlm([{ text: 'x' }], 'Un stop-loss limite la perte si le prix baisse.');
+    llm.generateWithTools = async () => {
+      throw new LlmError('tool_use_failed', 400);
+    };
+    const { service } = build(llm);
+    const reply = await service.ask(amine, { question: 'À quoi sert un stop-loss ?', run: 1 });
+    expect(reply).toMatchObject({ source: 'llm' });
+    expect(reply.agent).toBeUndefined();
+  });
+
+  it('se souvient des questions déjà posées dans la séance', async () => {
+    const llm = fakeAgentLlm([{ tools: ['get_memory'] }, { text: 'Première réponse.' }, { tools: ['get_memory'] }, { text: 'On en a déjà parlé : relis ton exposition.' }]);
+    const { service } = build(llm);
+    await service.ask(amine, { question: 'Mon risque ?', run: 1 });
+    await service.ask(amine, { question: 'Et mon exposition ?', run: 1 });
+    const toolResult = llm.toolRequests.at(-1)!.messages.find((m) => m.role === 'tool') as { content: string };
+    expect(toolResult.content).toContain('Mon risque ?');
+  });
+});
+
+describe('Trading Coach · réponse en direct', () => {
+  it('envoie les outils consultés, le texte au fil de l’eau, puis la réponse complète', async () => {
+    const llm = fakeAgentLlm([{ tools: ['get_portfolio'] }, { text: 'Ton exposition maximale a atteint 91,8 % de ton capital.' }]);
+    llm.streamWithTools = async (request, onText) => {
+      const out = await llm.generateWithTools!(request);
+      for (const word of out.text.split(/(?<= )/).filter(Boolean)) onText(word);
+      return out;
+    };
+    const { service } = build(llm);
+    const events: Array<{ type: string; [k: string]: unknown }> = [];
+    await service.stream(amine, { question: 'Mon risque ?', run: 1 }, (e) => events.push(e));
+    expect(events[0]).toEqual({ type: 'tool', name: 'get_portfolio' });
+    const text = events.filter((e) => e.type === 'delta').map((e) => e.text).join('');
+    expect(text).toBe('Ton exposition maximale a atteint 91,8 % de ton capital.');
+    const done = events.at(-1) as { type: string; reply: { answer: string; agent: boolean } };
+    expect(done.type).toBe('done');
+    expect(done.reply).toMatchObject({ answer: text, agent: true });
+  });
+
+  it('transforme une erreur de limite en événement lisible, sans couper la connexion', async () => {
+    const { service } = build();
+    const events: Array<{ type: string; [k: string]: unknown }> = [];
+    for (let i = 0; i < 21; i += 1) {
+      events.length = 0;
+      await service.stream(amine, { question: 'bonjour', run: 1 }, (e) => events.push(e));
+    }
+    expect(events).toEqual([{ type: 'error', status: 429, message: expect.stringContaining('Réessaie') }]);
+  });
+
+  it('sans modèle configuré : une seule réponse « done », rien n’est diffusé', async () => {
+    const { service } = build();
+    const events: Array<{ type: string }> = [];
+    await service.stream(amine, { question: 'bonjour', run: 1 }, (e) => events.push(e));
+    expect(events.map((e) => e.type)).toEqual(['done']);
   });
 });

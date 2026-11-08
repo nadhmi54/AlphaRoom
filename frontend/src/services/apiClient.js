@@ -53,3 +53,50 @@ export async function apiFetch(path, { method = 'GET', body, query } = {}) {
   }
   return data;
 }
+
+// Appel qui reçoit sa réponse en direct (server-sent events) : chaque événement `data: {...}`
+// est transmis à `onEvent` dès son arrivée. Sert au coach pour écrire la réponse mot à mot.
+export async function apiStream(path, { body, signal, onEvent }) {
+  const headers = { Accept: 'text/event-stream', 'Content-Type': 'application/json' };
+  const token = await accessToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  let response;
+  try {
+    response = await fetch(`${API_URL}${path}`, { method: 'POST', headers, body: JSON.stringify(body ?? {}), signal });
+  } catch (error) {
+    if (error?.name === 'AbortError') throw error;
+    throw new ApiError(0, 'Serveur injoignable. Vérifie que le backend est démarré.');
+  }
+  if (!response.ok || !response.body) {
+    const data = await response.json().catch(() => null);
+    const message = Array.isArray(data?.message) ? data.message.join(' ') : data?.message;
+    throw new ApiError(response.status, message || `Erreur ${response.status}`);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  const flush = (line) => {
+    if (!line.startsWith('data:')) return;
+    const data = line.slice(5).trim();
+    if (!data) return;
+    try {
+      onEvent(JSON.parse(data));
+    } catch {
+      // Un morceau illisible est ignoré : le flux continue.
+    }
+  };
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let newline = buffer.indexOf('\n');
+    while (newline >= 0) {
+      flush(buffer.slice(0, newline).replace(/\r$/, ''));
+      buffer = buffer.slice(newline + 1);
+      newline = buffer.indexOf('\n');
+    }
+  }
+  if (buffer.trim()) flush(buffer.trim());
+}

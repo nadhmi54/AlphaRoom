@@ -8,12 +8,14 @@ import { SimulationOrder } from './entities/sim-order.entity.js';
 import { SimulationTrade } from './entities/sim-trade.entity.js';
 import { GameEvent } from './entities/game-event.entity.js';
 import { GameSnapshot } from './entities/game-snapshot.entity.js';
+import { GameRunArchive } from './entities/game-run-archive.entity.js';
 import { Profile } from '../users/profile.entity.js';
 import { MarketDataModule } from '../portefeuille/market-data/market-data.module.js';
 import { GameRoomService } from './services/game-room.service.js';
 import { MarketSourceService } from './services/market-source.service.js';
 import { SimulationEngineService } from './services/simulation-engine.service.js';
 import { GameRoomAiService } from './services/game-room-ai.service.js';
+import { RunSnapshotService } from './services/run-snapshot.service.js';
 import { GameRoomController } from './game-room.controller.js';
 
 @Module({
@@ -27,13 +29,14 @@ import { GameRoomController } from './game-room.controller.js';
       SimulationTrade,
       GameEvent,
       GameSnapshot,
+      GameRunArchive,
       Profile,
     ]),
     // Flux live (Binance/Finnhub) et historique intégré (market_ticks) de M1.
     MarketDataModule,
   ],
   controllers: [GameRoomController],
-  providers: [GameRoomService, MarketSourceService, SimulationEngineService, GameRoomAiService],
-  exports: [GameRoomService, MarketSourceService, SimulationEngineService],
+  providers: [GameRoomService, MarketSourceService, SimulationEngineService, GameRoomAiService, RunSnapshotService],
+  exports: [GameRoomService, MarketSourceService, SimulationEngineService, RunSnapshotService],
 })
 export class GameRoomModule {}
