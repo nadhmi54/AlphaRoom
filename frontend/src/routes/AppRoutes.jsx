@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import HomePage from '../pages/Home/HomePage.jsx';
 import LoadingScreen from '../components/LoadingScreen/LoadingScreen.jsx';
 import RouteLoader from '../components/RouteLoader/RouteLoader.jsx';
@@ -19,6 +19,7 @@ const MarketFeaturePage = lazy(() => import('../pages/portefeuille/market/Market
 
 // Module 2 : Game Room — Salle de simulation pédagogique
 const GameRoomPage = lazy(() => import('../pages/GameRoom/GameRoomPage.jsx'));
+const InsuranceSimulatorPage = lazy(() => import('../pages/assurance/InsuranceSimulatorPage.jsx'));
 
 const PAGES = [
   { path: '/connexion', Page: SignInPage },
@@ -35,6 +36,7 @@ const PAGES = [
   { path: '/portefeuille', Page: PortefeuillePage, protect: true, roles: TRADING_ROLES },
   // Module 2 : Game Room
   { path: '/game-room', Page: GameRoomPage },
+  { path: '/actuariat', Page: InsuranceSimulatorPage },
 ];
 
 export default function AppRoutes() {
@@ -43,6 +45,7 @@ export default function AppRoutes() {
       <RouteLoader />
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/simulateur-assurance" element={<Navigate to="/actuariat" replace />} />
         {PAGES.map(({ path, Page, protect, roles }) => (
           <Route
             key={path}

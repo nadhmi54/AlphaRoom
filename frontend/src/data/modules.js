@@ -34,4 +34,18 @@ export const MODULES = [
     imageAlt: 'Salle de simulation pédagogique avec contrôle enseignant et participants',
     path: '/game-room',
   },
+  {
+    id: 'actuariat',
+    number: 'M6',
+    title: "Actuariat & Risque d'Assurance",
+    role: 'Actuaire / Analyste assurance',
+    question: "Comment modéliser et prévoir les risques liés à l'assurance ?",
+    description:
+      'Estime une prime automobile à partir du profil conducteur, du véhicule et des garanties, puis observe l’impact de chaque facteur sur le risque.',
+    tags: ['Tarification', 'Bonus / malus', 'Garanties'],
+    accent: '#79b89b',
+    image: '/images/modules/m6-actuariat.jpg',
+    imageAlt: 'Données et indicateurs d’analyse actuarielle',
+    path: '/actuariat',
+  },
 ];

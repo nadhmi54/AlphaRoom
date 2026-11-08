@@ -60,16 +60,16 @@ export default function Features() {
         <header className="ar-features__head">
           <span className="ar-features__pill">
             <span className="ar-features__pill-dot" />
-            Module fonctionnel · Portefeuille
+            Modules fonctionnels · Finance &amp; assurance
           </span>
           <h2 className="ar-features__title">
-            Une salle de marché,
+            Des outils pour comprendre,
             <br />
-            <span className="ar-features__title--accent">un portefeuille complet.</span>
+            <span className="ar-features__title--accent">simuler et décider.</span>
           </h2>
           <p className="ar-features__lead">
-            Carnet d&apos;ordres simulé, exécution au prix du marché et suivi du portefeuille :
-            de l&apos;ordre de bourse au P&amp;L, dans des conditions réelles.
+            Du trading aux scénarios pédagogiques et à la tarification d’assurance, explorez des
+            simulations pour analyser les marchés et mieux comprendre les risques.
           </p>
         </header>
 
