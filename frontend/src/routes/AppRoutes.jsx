@@ -20,6 +20,14 @@ const MarketFeaturePage = lazy(() => import('../pages/portefeuille/market/Market
 // Module 2 : Game Room — Salle de simulation pédagogique
 const GameRoomPage = lazy(() => import('../pages/GameRoom/GameRoomPage.jsx'));
 
+// Module 3 : Academy — Formation, pédagogie et engagement
+const AcademyCatalogPage = lazy(() => import('../features/academy/pages/AcademyCatalogPage.jsx'));
+const AcademyCoursePage = lazy(() => import('../features/academy/pages/AcademyCoursePage.jsx'));
+const AcademyQuizPage = lazy(() => import('../features/academy/pages/AcademyQuizPage.jsx'));
+const AcademyMissionsPage = lazy(() => import('../features/academy/pages/AcademyMissionsPage.jsx'));
+const AcademyProgressPage = lazy(() => import('../features/academy/pages/AcademyProgressPage.jsx'));
+const AcademyBadgesPage = lazy(() => import('../features/academy/pages/AcademyBadgesPage.jsx'));
+
 const PAGES = [
   { path: '/connexion', Page: SignInPage },
   { path: '/inscription', Page: SignUpPage },
@@ -35,6 +43,13 @@ const PAGES = [
   { path: '/portefeuille', Page: PortefeuillePage, protect: true, roles: TRADING_ROLES },
   // Module 2 : Game Room
   { path: '/game-room', Page: GameRoomPage },
+  // Module 3 : Academy — ouverte à tout compte connecté (pas de rôle requis)
+  { path: '/academy', Page: AcademyCatalogPage, protect: true },
+  { path: '/academy/cours/:id', Page: AcademyCoursePage, protect: true },
+  { path: '/academy/quiz/:id', Page: AcademyQuizPage, protect: true },
+  { path: '/academy/missions', Page: AcademyMissionsPage, protect: true },
+  { path: '/academy/progression', Page: AcademyProgressPage, protect: true },
+  { path: '/academy/badges', Page: AcademyBadgesPage, protect: true },
 ];
 
 export default function AppRoutes() {

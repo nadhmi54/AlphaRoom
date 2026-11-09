@@ -13,6 +13,7 @@ import { MarketDataModule } from './portefeuille/market-data/market-data.module.
 import { GameRoomModule } from './game-room/game-room.module.js';
 import { PerformanceModule } from './portefeuille/performance/performance.module.js';
 import { MarketModule } from './portefeuille/market/market.module.js';
+import { AcademyModule } from './academy/academy.module.js';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { MarketModule } from './portefeuille/market/market.module.js';
     PerformanceModule,
     MarketModule,
     AiModule,
+    AcademyModule,
     // Domain modules (marché & exécution, portefeuille & risque, IA,
     // stress testing...) plug in here as they're built — see the README's
     // "Modules fonctionnels" table for the 6 modules this maps to.
