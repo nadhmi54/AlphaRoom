@@ -19,10 +19,18 @@ export default function AcademyQuizPage() {
     else navigate('/academy');
   };
 
+  // Après réussite du quiz, on propose de jouer la mission du niveau correspondant
+  // directement dans la Game Room (la mission est affichée en bandeau sur la salle).
+  const playMission = (missionId) => {
+    navigate(`/game-room?mission=${missionId}`);
+  };
+
   return (
     <AcademyShell title={quiz?.title || 'Quiz'} subtitle="Réponds à toutes les questions, puis valide.">
       <AcademyState loading={loading} error={error} onRetry={reload}>
-        {quiz && <QuizRunner quiz={quiz} submit={handleSubmit} onExit={exit} />}
+        {quiz && (
+          <QuizRunner quiz={quiz} submit={handleSubmit} onExit={exit} onPlayMission={playMission} />
+        )}
       </AcademyState>
     </AcademyShell>
   );

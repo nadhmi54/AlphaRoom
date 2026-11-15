@@ -26,6 +26,9 @@ export const drawCourseQuiz = (courseId) =>
 // Missions et défis, avec leurs critères et leur fenêtre de validité.
 export const getMissions = () => apiFetch('/academy/missions');
 
+// Détail d'une mission (titre, description, scénario, critères, état).
+export const getMission = (missionId) => apiFetch(`/academy/missions/${missionId}`);
+
 // Progression du joueur : XP, niveau et avancement par compétence.
 export const getMyProgress = () => apiFetch('/academy/progress/me');
 

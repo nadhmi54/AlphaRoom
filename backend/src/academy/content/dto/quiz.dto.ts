@@ -63,6 +63,12 @@ export class QuizResultDto {
   @Expose() totalQuestions!: number;
   @Expose() threshold!: number;
 
+  /** Niveau du cours auquel appartient le quiz (null si non rattaché). */
+  @Expose() courseLevel!: number | null;
+
+  /** Identifiant de la mission correspondant au niveau du cours. */
+  @Expose() missionId!: string | null;
+
   @Expose()
   @Type(() => GradedAnswerDto)
   answers!: GradedAnswerDto[];

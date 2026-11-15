@@ -5,7 +5,7 @@ import { useState } from 'react';
  * correction, le score et le seuil de réussite sont calculés par le serveur.
  * `submit` reçoit la liste des réponses et renvoie le résultat corrigé.
  */
-export default function QuizRunner({ quiz, submit, onExit }) {
+export default function QuizRunner({ quiz, submit, onExit, onPlayMission }) {
   const [selections, setSelections] = useState({});
   const [result, setResult] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -110,6 +110,15 @@ export default function QuizRunner({ quiz, submit, onExit }) {
             {result.totalQuestions} bonnes réponses (seuil {result.threshold} %).
           </p>
           <div className="ar-ac-result__actions">
+            {result.passed && result.missionId && onPlayMission && (
+              <button
+                type="button"
+                className="ar-ac-btn ar-ac-btn--primary"
+                onClick={() => onPlayMission(result.missionId)}
+              >
+                Jouer la mission
+              </button>
+            )}
             <button
               type="button"
               className="ar-ac-btn ar-ac-btn--ghost"

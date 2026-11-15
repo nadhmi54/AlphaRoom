@@ -13,6 +13,7 @@ import { AcademyUserUnlock } from '../progress/academy-user-unlock.entity.js';
 import { AcademyAccessService } from '../path/academy-access.service.js';
 import { isLevelOpen, levelBadgeCode } from '../path/path-logic.js';
 import { AcademyRulesService } from '../rules/academy-rules.service.js';
+import { AcademyMission } from '../missions/academy-mission.entity.js';
 import { gradeQuiz } from './quiz-grading.js';
 import { QuizDto, QuizResultDto, SubmitQuizDto, type QuizAnswerDto } from './dto/quiz.dto.js';
 
@@ -44,6 +45,8 @@ export class AcademyQuizService {
     private readonly progress: Repository<AcademyUserProgress>,
     @InjectRepository(AcademyQuizAttempt)
     private readonly attempts: Repository<AcademyQuizAttempt>,
+    @InjectRepository(AcademyMission)
+    private readonly missions: Repository<AcademyMission>,
     private readonly access: AcademyAccessService,
     private readonly rules: AcademyRulesService,
   ) {}
@@ -99,6 +102,21 @@ export class AcademyQuizService {
     );
 
     const courseId = await this.resolveCourseId(quiz);
+    let courseLevel: number | null = null;
+    let missionId: string | null = null;
+
+    if (courseId) {
+      const course = await this.courses.findOne({ where: { id: courseId } });
+      if (course) {
+        courseLevel = course.level;
+        const mission = await this.missions.findOne({
+          where: { level: course.level, isActive: true },
+          order: { position: 'ASC' },
+        });
+        if (mission) missionId = mission.id;
+      }
+    }
+
     if (quiz.lessonId && courseId) {
       await this.recordLessonScore(userId, quiz, courseId, grade.score, grade.passed);
     }
@@ -122,6 +140,8 @@ export class AcademyQuizService {
       correctCount: grade.correctCount,
       totalQuestions: grade.totalQuestions,
       threshold,
+      courseLevel,
+      missionId,
       answers: grade.answers,
     });
   }
