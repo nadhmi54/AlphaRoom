@@ -37,7 +37,7 @@ export function hashSeed(text: string): number {
 }
 
 /** Loi normale centrée réduite (Box-Muller). */
-function gaussian(random: () => number): number {
+export function gaussian(random: () => number): number {
   let u = 0;
   while (u === 0) u = random();
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * random());

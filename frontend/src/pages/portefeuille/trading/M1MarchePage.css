@@ -415,3 +415,31 @@
     padding: 16px;
   }
 }
+
+/* ---- Refonte UI : surface de carte unifiée ---- */
+.m1-card {
+  position: relative;
+  border-color: var(--ar-line);
+  border-radius: var(--ar-radius-lg);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012)),
+    var(--ar-bg-1);
+  box-shadow: var(--ar-shadow-1);
+}
+.m1-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 24px;
+  right: 24px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--ar-accent-line), transparent);
+  pointer-events: none;
+}
+.m1-card-heading h3 {
+  font-size: 18px;
+  letter-spacing: -0.3px;
+}
+.m1-eyebrow {
+  letter-spacing: 0.16em;
+}

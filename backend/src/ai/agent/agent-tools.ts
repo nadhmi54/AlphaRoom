@@ -5,6 +5,8 @@ import type { ToolSpec } from '../llm/llm-provider.js';
 import type { Evidence } from '../metrics/metrics.js';
 import { canonicalEngineSymbol } from '../../portefeuille/market-data/market-feed-config.js';
 import { evaluateGuide } from './guide-rules.js';
+import { buildTradingOptions } from './trading-options.js';
+import { projectAfterShock } from '../market/shock-projection.js';
 import type { MarketToolsPort, PositionContext } from '../market/market-analysis.service.js';
 import { currentMinute, liveState, roundPrice, type OpenPosition } from './live-state.js';
 
@@ -117,6 +119,18 @@ export const TOOL_SPECS: ToolSpec[] = [
       },
       ['risk_pct', 'stop_price'],
     ),
+  },
+  {
+    name: 'get_trading_options',
+    description:
+      'OPTIONS DU TRADER : pour chaque actif, ce qu’il PEUT faire maintenant (peut_acheter / quantité maximale selon son cash, peut_vendre / quantité détenue ; pas de vente à découvert) et les options raisonnables (acheter une partie, attendre, garder, poser un stop, alléger, clôturer) avec pourquoi, risques et ce qui ferait changer d’avis. À appeler pour « puis-je acheter / vendre ? », « que puis-je faire ? », « quand vendre ? ». Lecture seule : l’étudiant décide et passe lui-même l’ordre.',
+    parameters: obj({ symbol: { type: 'string', description: 'Actif visé (ex. XAU/USD). Absent : tous les actifs de la séance.' } }),
+  },
+  {
+    name: 'project_after_shock',
+    description:
+      'PROJECTION APRÈS CHOC dans la séance : dernier choc de marché (prix, volatilité, grosse transaction), éventail des trajectoires possibles (bas 5 %, médiane, haut 95 %) sur les prochaines minutes, trois scénarios (retour au niveau d’avant, rebond partiel, continuation), probabilité de repasser par le niveau d’avant le choc, et l’effet sur la position du trader (gain/perte dans l’éventail, probabilité que son stop soit touché). À appeler pour « que va faire le prix après le choc ? », « ça va remonter ? ». Ce n’est PAS une prévision : présente-la comme des scénarios et une fourchette.',
+    parameters: obj({ symbol: { type: 'string', description: 'Actif visé (ex. XAU/USD). Absent : l’actif le plus déplacé par le choc.' } }),
   },
   {
     name: 'get_memory',
@@ -419,6 +433,22 @@ export function buildToolbox(input: ToolboxInput): AgentToolbox {
         },
         evidence: [{ type: 'minute', value: state.minute }],
       };
+    },
+
+    get_trading_options: (args) => ({
+      data: buildTradingOptions(session, participantId, typeof args.symbol === 'string' ? args.symbol : undefined) as unknown as Record<string, unknown>,
+      evidence: [{ type: 'minute', value: now }],
+    }),
+
+    project_after_shock: (args) => {
+      const projection = projectAfterShock(session, {
+        participantId,
+        ...(typeof args.symbol === 'string' ? { symbol: args.symbol } : {}),
+      });
+      if (!projection) {
+        return { data: { message: 'Aucun choc de marché récent à projeter (ou la séance est terminée).' }, evidence: [{ type: 'minute', value: now }] };
+      }
+      return { data: projection as unknown as Record<string, unknown>, evidence: [{ type: 'minute', value: now }] };
     },
 
     get_memory: () => ({ data: input.memory(), evidence: [] }),

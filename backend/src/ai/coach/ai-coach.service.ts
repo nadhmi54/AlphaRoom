@@ -5,6 +5,7 @@ import type { Profile } from '../../users/profile.entity.js';
 import { AiAccessError, buildParticipantContext, type ParticipantContext } from '../context/ai-context.js';
 import { hashValue } from '../context/stable-json.js';
 import { SESSION_DATA_PROVIDER, type SessionDataProvider } from '../contract/session-data-provider.js';
+import type { SessionData } from '../contract/session-data.js';
 import { LLM_PROVIDER, LlmError, type LlmProvider } from '../llm/llm-provider.js';
 import type { Evidence } from '../metrics/metrics.js';
 import { buildCoachRequest, PROMPT_VERSION } from '../prompts/prompts.js';
@@ -17,7 +18,8 @@ import { MarketAnalysisService } from '../market/market-analysis.service.js';
 import { AiConversationsService } from './ai-conversations.service.js';
 import { wrapUntrusted } from '../prompts/prompts.js';
 import { currentMinute } from '../agent/live-state.js';
-import { buildRuleAnswer, validateCoachText } from './coach-answer.js';
+import { buildRuleAnswer, detectIntent, validateCoachText } from './coach-answer.js';
+import { buildTradingOptions, describeOptions } from '../agent/trading-options.js';
 import type { AskCoachDto } from './ai-coach.dto.js';
 import { SlidingWindowLimiter } from './rate-limiter.js';
 
@@ -216,7 +218,8 @@ export class AiCoachService {
     const contextHash = hashValue(context);
     const base = { sessionId: session.sessionId, run: session.run, promptVersion: PROMPT_VERSION, contextHash, notice: NOTICE };
 
-    const rules = buildRuleAnswer(context, dto.question);
+    const optionsText = this.optionsTextFor(session, participantId, dto.question);
+    const rules = buildRuleAnswer(context, dto.question, optionsText);
     // Sans modèle configuré : réponse du code, rien ne part vers l'extérieur.
     if (this.llm.name === 'stub') return { ...base, answer: rules.text, source: 'rules', evidence: rules.evidence };
 
@@ -231,6 +234,7 @@ export class AiCoachService {
           history,
           ...(summary ? { summary } : {}),
           durationMinutes: session.durationMinutes,
+          sessionBrief: sessionBrief(session),
           ...(hooks.onEvent
             ? {
                 onText: (text: string) => hooks.onEvent!({ type: 'delta', text }),
@@ -252,12 +256,17 @@ export class AiCoachService {
             evidence: result.evidence.length > 0 ? result.evidence : rules.evidence,
           };
         }
+        this.logger.warn('Coach (agent) : réponse vide, passage au chemin classique.');
         // Texte refusé par le contrôle : on tente le chemin classique ci-dessous (contexte complet, sans outils).
       } catch (error) {
         if (!(error instanceof LlmError)) throw error;
+        this.logger.warn(`Coach (agent) : ${describe(error)}`);
         // Le fournisseur n'a pas géré les outils (ou est tombé) : chemin classique ci-dessous.
       }
     }
+
+    // Question « puis-je acheter / vendre ? » sans agent : le code donne les options avec leurs raisons (le modèle classique n'a pas les données en direct).
+    if (optionsText && rules.intent === 'advice') return { ...base, answer: rules.text, source: 'rules', evidence: rules.evidence };
 
     try {
       const request = buildCoachRequest({
@@ -295,6 +304,20 @@ export class AiCoachService {
     }
   }
 
+  /** Texte « ce que tu peux faire » écrit par le code, pour les questions d'achat / vente quand le modèle est indisponible. */
+  private optionsTextFor(session: SessionData, participantId: string, question: string): string | undefined {
+    const intent = detectIntent(question);
+    if (intent !== 'advice' && intent !== 'overview') return undefined;
+    // Un simple salut garde le résumé habituel ; toute autre question ouverte (« réponds-moi », « et maintenant ? ») reçoit les options.
+    if (intent === 'overview' && /^\s*(bonjour|bonsoir|salut|hello|coucou|merci)\b/i.test(question)) return undefined;
+    try {
+      const text = describeOptions(buildTradingOptions(session, participantId));
+      return intent === 'overview' ? `Voici où tu en es et ce que tu peux faire.\n\n${text}` : text;
+    } catch {
+      return undefined;
+    }
+  }
+
   private async recordUsage(profile: Profile, session: { sessionId: string; run: number }, model: string, usage: { inputTokens: number; outputTokens: number }) {
     await this.usage.save(
       this.usage.create({
@@ -314,4 +337,10 @@ export class AiCoachService {
   private resolve(profile: Profile, dto: AskCoachDto) {
     return resolveSessionFor(this.sessions, profile, dto);
   }
+}
+
+/** Rappel de la séance donné au coach : il n'a jamais à demander à l'étudiant quel actif ou quelle séance. */
+export function sessionBrief(session: SessionData): string {
+  const minute = currentMinute(session);
+  return `actifs disponibles : ${session.symbols.join(', ')} ; minute actuelle : ${minute} sur ${session.durationMinutes}.`;
 }

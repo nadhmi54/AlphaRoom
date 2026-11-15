@@ -616,3 +616,32 @@
   background: rgba(255, 255, 255, 0.12);
   color: #ffffff;
 }
+
+/* ---- Refonte UI ---- */
+.lm-stage,
+.qt {
+  position: relative;
+  border-color: var(--ar-line);
+  border-radius: var(--ar-radius-lg);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012)),
+    var(--ar-bg-1);
+  box-shadow: var(--ar-shadow-1);
+}
+.lm-assets button {
+  transition:
+    border-color var(--ar-fast) ease,
+    background var(--ar-fast) ease,
+    transform var(--ar-fast) ease;
+}
+.lm-assets button:hover {
+  transform: translateY(-2px);
+  border-color: var(--ar-accent-line);
+}
+.lm-empty {
+  padding: 28px 16px;
+  text-align: center;
+  border: 1px dashed var(--ar-line-strong);
+  border-radius: var(--ar-radius);
+  background: radial-gradient(60% 90% at 50% 0%, rgba(217, 184, 119, 0.06), transparent 70%);
+}

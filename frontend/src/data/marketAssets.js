@@ -6,7 +6,8 @@
 export const MARKET_ASSETS = [
   {
     id: 'xau',
-    image: '/images/markets/xau.jpg',
+    accent: '#d9b877',
+    glyph: 'Au',
     category: 'Métaux précieux',
     symbol: 'XAU/USD',
     name: 'Or',
@@ -23,7 +24,8 @@ export const MARKET_ASSETS = [
   },
   {
     id: 'xag',
-    image: '/images/markets/xag.jpg',
+    accent: '#cbd0db',
+    glyph: 'Ag',
     category: 'Métaux précieux',
     symbol: 'XAG/USD',
     name: 'Argent',
@@ -40,7 +42,8 @@ export const MARKET_ASSETS = [
   },
   {
     id: 'oil',
-    image: '/images/markets/oil.jpg',
+    accent: '#c9a36b',
+    glyph: 'WTI',
     category: 'Matières premières',
     symbol: 'WTI/USD',
     name: 'Pétrole',
@@ -57,7 +60,8 @@ export const MARKET_ASSETS = [
   },
   {
     id: 'eurusd',
-    image: '/images/markets/eurusd.jpg',
+    accent: '#8ea8d0',
+    glyph: '€/$',
     category: 'Devises (Forex)',
     symbol: 'EUR/USD',
     name: 'Euro/Dollar',
@@ -74,7 +78,8 @@ export const MARKET_ASSETS = [
   },
   {
     id: 'sp500',
-    image: '/images/markets/sp500.jpg',
+    accent: '#9db4c8',
+    glyph: 'S&P',
     category: 'Indices actions',
     symbol: 'SPX',
     name: 'S&P 500',

@@ -96,3 +96,9 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ---- Refonte UI ---- */
+.ar-ps__main--wide table {
+  border-collapse: separate;
+  border-spacing: 0;
+}

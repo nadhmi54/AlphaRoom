@@ -1,22 +1,16 @@
 import { Link } from 'react-router-dom';
 import { MODULES } from '../../data/modules.js';
 import { useAuth } from '../../context/useAuth.js';
+import { ModuleArt } from '../Art/Art.jsx';
 import './Features.css';
 
 function ModuleCard({ module }) {
-  const { number, title, role, question, description, tags, accent, image, imageAlt, path } = module;
+  const { id, number, title, role, question, description, tags, accent, path } = module;
 
   return (
     <article className="ar-module-card" style={{ '--card-accent': accent }}>
       <div className="ar-module-card__media">
-        <img
-          src={image}
-          alt={imageAlt}
-          width="800"
-          height="500"
-          loading="lazy"
-          className="ar-module-card__img"
-        />
+        <ModuleArt id={id} color={accent} className="ar-module-card__img" />
         <span className="ar-module-card__number">{number}</span>
       </div>
 

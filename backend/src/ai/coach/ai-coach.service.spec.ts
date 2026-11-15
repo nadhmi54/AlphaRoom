@@ -82,11 +82,29 @@ describe('Trading Coach', () => {
     expect(reply.answer).not.toContain('47');
   });
 
-  it('modèle qui conseille d’acheter ou vendre : refusé', async () => {
+  it('question « que faire ? » : le code donne les options avec leurs raisons, sans dire « vends » ni passer d’ordre', async () => {
     const { service } = build(fakeLlm(() => 'Je te conseille de vendre tout de suite.'));
     const reply = await service.ask(amine, { question: 'Que faire ?', run: 1 });
     expect(reply.source).toBe('rules');
-    expect(reply.answer).toContain('Je ne peux pas');
+    expect(reply.answer).toContain('l’étudiant décide');
+    expect(reply.answer).toContain('Risque :');
+    expect(reply.answer).not.toContain('Je te conseille');
+  });
+
+  it('question « puis-je vendre ? » : dit ce qu’il peut vendre et pourquoi, la décision lui revient', async () => {
+    const { service } = build(fakeLlm(() => 'Vends tout.'));
+    const reply = await service.ask(amine, { question: 'Est-ce que je peux vendre maintenant ?', run: 1 });
+    expect(reply.source).toBe('rules');
+    expect(reply.answer).toMatch(/tu peux vendre jusqu’à|rien à vendre/);
+    expect(reply.answer).toContain('l’étudiant décide');
+  });
+
+  it('message court « réponds-moi » : plus d’impasse « aucun ordre », le code dit ce qu’il peut faire', async () => {
+    const { service } = build(fakeLlm(() => 'Tu as perdu 47 % de ton capital.'));
+    const reply = await service.ask(amine, { question: 'réponds moi', run: 1 });
+    expect(reply.source).toBe('rules');
+    expect(reply.answer).not.toContain('aucun ordre');
+    expect(reply.answer).toContain('l’étudiant décide');
   });
 
   it('première réponse refusée puis corrigée : le texte du modèle est montré', async () => {

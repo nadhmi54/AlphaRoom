@@ -57,7 +57,7 @@ describe('outils de l’agent', () => {
 
   it('expose seulement des outils de lecture ou de simulation, jamais d’écriture', () => {
     const names = toolbox().specs.map((s) => s.name);
-    expect(names.every((n) => /^(get_|simulate_|position_size|scan_|analyze_)/.test(n))).toBe(true);
+    expect(names.every((n) => /^(get_|simulate_|position_size|scan_|analyze_|project_)/.test(n))).toBe(true);
     expect(names.some((n) => /order|buy|sell|place|delete|update|set_/.test(n))).toBe(false);
   });
 
@@ -111,6 +111,23 @@ describe('outils de l’agent', () => {
     const tight = toolbox().run('position_size', '{"risk_pct": 50, "stop_price": 2679}').data;
     expect(tight.limite_par_le_cash).toBe(true);
     expect(toolbox().run('position_size', '{"risk_pct": 0, "stop_price": 2650}').data.erreur).toBeDefined();
+  });
+
+  it('projette la courbe après un choc, avec l’effet sur la vraie position du trader', () => {
+    const shocked = liveSession({
+      minute: 14,
+      priceFor: (m) => (m < 11 ? 2700 : 2619) + (m % 2) * 3,
+      events: [{ id: 'ev-shock', minute: 11, type: 'price_shock', label: 'Choc de prix : -3 %' }],
+      participants: [{ id: 'a', trades: [buy('t1', 5, 20, 2700)] }],
+    });
+    const tools = buildToolbox({ session: shocked, participantId: 'a', memory: () => ({}) });
+    const { data } = tools.run('project_after_shock', '{}');
+    expect(data).toMatchObject({ actif: 'XAU/USD', choc: { minute: 11 } });
+    expect((data.scenarios as unknown[]).length).toBe(3);
+    expect((data.ta_position as { quantite: number }).quantite).toBe(20);
+    expect(JSON.stringify(data)).toContain('pas une prévision');
+    // Sans choc : message clair, pas d'erreur.
+    expect(toolbox().run('project_after_shock', '{}').data.message).toContain('Aucun choc');
   });
 
   it('les simulations n’ont rien à simuler sans position', () => {

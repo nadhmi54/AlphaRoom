@@ -4,8 +4,16 @@ import PageShell from '../../components/PageShell/PageShell.jsx';
 import CoachWidget from '../../components/CoachWidget/CoachWidget.jsx';
 import { listAiSessions, listReports } from '../../services/aiService.js';
 import ReportView from './ReportView.jsx';
+import AiSteps, { DocIcon } from './AiSteps.jsx';
+import ProgressPanel from './ProgressPanel.jsx';
 import { formatDateTime, formatScore, runLabel } from './aiLabels.js';
 import './AiPages.css';
+
+const HOWTO = [
+  { title: 'Tu joues la séance', text: 'Tes ordres et tes réactions aux événements sont enregistrés.' },
+  { title: 'Ton enseignant contrôle', text: 'L’IA prépare un brouillon ; il le corrige puis le valide.' },
+  { title: 'Tu lis ta note', text: 'Chaque critère indique la règle appliquée et les preuves associées.' },
+]; 
 
 /**
  * Espace étudiant : les bilans publiés par l'enseignant, avec la règle et les
@@ -43,14 +51,17 @@ export default function StudentAiPage() {
   }, []);
 
   const selected = items?.find((item) => item.report.id === selectedId);
+  const titles = Object.fromEntries((items ?? []).map(({ session }) => [session.sessionId, session.title]));
 
   return (
-    <PageShell wide title="Mes bilans de séance" subtitle="Chaque note s’explique : la règle appliquée et les preuves sont écrites sous chaque critère.">
+    <PageShell wide eyebrow="Module IA · Étudiant" title="Mes bilans de séance" subtitle="Chaque note s’explique : la règle appliquée et les preuves sont écrites sous chaque critère.">
       {items === null && <p className="ai-muted">Chargement…</p>}
       {error && <div className="ar-ps__banner ar-ps__banner--error" role="alert">{error}</div>}
 
       {items !== null && items.length === 0 && !error && (
+        <div className="ai-empty-layout">
         <div className="ai-empty-card">
+          <DocIcon />
           <h2>Aucun bilan publié pour l’instant</h2>
           <p className="ai-muted">
             Ton enseignant relit et valide chaque bilan avant de te le montrer. Reviens après le débriefing de la séance.
@@ -58,9 +69,16 @@ export default function StudentAiPage() {
           </p>
           <Link to="/marche" className="ar-ps__btn">Retour au marché</Link>
         </div>
+        <aside className="ai-howto">
+          <h3>Comment ça se passe</h3>
+          <AiSteps label="Du trading au bilan" steps={HOWTO} />
+        </aside>
+        </div>
       )}
 
       {items !== null && items.length > 0 && (
+        <>
+        <ProgressPanel titles={titles} refreshKey={items.length} />
         <div className="ai-student">
           <nav className="ai-student__list" aria-label="Mes bilans">
             {items.map(({ session, report }) => (
@@ -78,6 +96,7 @@ export default function StudentAiPage() {
           </nav>
           {selected && <ReportView report={selected.report} />}
         </div>
+        </>
       )}
       <CoachWidget />
     </PageShell>

@@ -21,12 +21,29 @@ import { evaluateParticipant } from '../evaluator/report-evaluator.js';
 import { LLM_PROVIDER, type LlmProvider } from '../llm/llm-provider.js';
 import { applyReportEdit, ReportEditError, type ReportEdit } from '../report/report-edit.js';
 import type { EvaluationReport, ReportTrace } from '../report/report-types.js';
+import {
+  buildProgress,
+  diffReports,
+  summarizeClass,
+  type ClassSummary,
+  type Progress,
+  type ReportChange,
+} from '../report/report-stats.js';
 import type { EditReportDto, GenerateReportDto } from '../dto/ai-report.dto.js';
 import { AiReport, type ReportStatus } from './ai-report.entity.js';
 import { AiReportRevision, type RevisionKind } from './ai-report-revision.entity.js';
 import { AiUsage } from './ai-usage.entity.js';
 
 const MAX_PARTICIPANTS = 50;
+
+export interface RevisionView {
+  id: string;
+  kind: RevisionKind;
+  at: Date;
+  /** Vrai quand la modification vient de la personne qui consulte l'historique. */
+  byYou: boolean;
+  changes: ReportChange[];
+}
 
 export interface ReportView {
   id: string;
@@ -185,6 +202,48 @@ export class AiReportsService {
     };
   }
 
+  /** Tableau de bord d'une séance pour l'enseignant : avancement des bilans et notes de la classe. */
+  async classSummary(profile: Profile, query: { sessionId: string; run: number }): Promise<ClassSummary & { sessionId: string; run: number }> {
+    this.requireTeacher(profile);
+    const rows = await this.reports.find({ where: { sessionId: query.sessionId, run: query.run } });
+    const expected = await this.participantCount(query.sessionId, query.run);
+    return { sessionId: query.sessionId, run: query.run, ...summarizeClass(rows, expected) };
+  }
+
+  /**
+   * Évolution des notes d'un étudiant à partir de ses bilans publiés. Un
+   * étudiant ne voit que lui-même ; l'enseignant désigne le participant.
+   */
+  async progress(profile: Profile, participantId?: string): Promise<Progress> {
+    let target = profile.id;
+    if (isTeacher(profile)) {
+      if (!participantId) throw new BadRequestException('Précise le participant (participantId).');
+      target = participantId;
+    }
+    const rows = await this.reports.find({ where: { participantId: target } });
+    return buildProgress(rows.filter((row) => this.visibleToStudent(row)));
+  }
+
+  /** Historique des changements d'un bilan, du plus ancien au plus récent, avec ce qui a changé. */
+  async history(profile: Profile, id: string): Promise<{ reportId: string; revisions: RevisionView[] }> {
+    this.requireTeacher(profile);
+    await this.mustFind(id);
+    const rows = await this.revisions.find({ where: { reportId: id } });
+    const ordered = [...rows].sort(
+      (a, b) => a.createdAt.getTime() - b.createdAt.getTime() || Number(a.id) - Number(b.id),
+    );
+    return {
+      reportId: id,
+      revisions: ordered.map((row) => ({
+        id: String(row.id),
+        kind: row.kind,
+        at: row.createdAt,
+        byYou: row.editorId === profile.id,
+        changes: diffReports(row.before, row.after),
+      })),
+    };
+  }
+
   /* ---------------------------------------------------------------- */
 
   private requireTeacher(profile: Profile) {
@@ -213,6 +272,15 @@ export class AiReportsService {
 
   private record(reportId: string, editorId: string, kind: RevisionKind, before: EvaluationReport | null, after: EvaluationReport) {
     return this.revisions.save(this.revisions.create({ reportId, editorId, kind, before, after }));
+  }
+
+  /** Nombre de participants de la séance ; null si la simulation n'est pas joignable. */
+  private async participantCount(sessionId: string, run: number): Promise<number | null> {
+    try {
+      return (await this.sessions.getSession(sessionId, run)).participants.length;
+    } catch {
+      return null;
+    }
   }
 
   /** Noms affichés (enseignant seulement). Si la séance est indisponible, on affiche les alias. */

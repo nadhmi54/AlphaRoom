@@ -6,6 +6,14 @@ import ReplayTab from './ReplayTab.jsx';
 import ReportsTab from './ReportsTab.jsx';
 import { runLabel } from './aiLabels.js';
 import './AiPages.css';
+import AiSteps from './AiSteps.jsx';
+
+const FLOW = [
+  { title: 'Générer', text: 'L’IA prépare un brouillon de bilan pour chaque étudiant du passage.' },
+  { title: 'Relire', text: 'Tu lis le texte, les règles appliquées et les preuves de chaque critère.' },
+  { title: 'Corriger', text: 'Tu peux ajuster une note ou la synthèse ; le bilan repasse en brouillon.' },
+  { title: 'Publier', text: 'Après ta validation seulement, l’étudiant voit son bilan.' },
+];
 
 const TABS = [
   { id: 'reports', label: 'Bilans' },
@@ -69,6 +77,7 @@ export default function TeacherAiPage() {
   return (
     <PageShell
       wide
+      eyebrow="Module IA · Enseignant"
       title="Espace enseignant — IA"
       subtitle="L’IA prépare, tu relis et tu décides : rien n’est publié sans ta validation."
     >
@@ -85,6 +94,7 @@ export default function TeacherAiPage() {
 
       {sessions !== null && (
         <>
+          <AiSteps label="Déroulé d’un bilan" steps={FLOW} />
           <div className="ai-picker">
             {sessions.length > 0 ? (
               <>

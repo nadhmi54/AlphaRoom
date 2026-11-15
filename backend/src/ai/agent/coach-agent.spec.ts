@@ -45,6 +45,39 @@ describe('boucle de l’agent coach', () => {
     expect(second.messages.at(-2)).toMatchObject({ role: 'assistant' });
   });
 
+  it('« puis-je vendre ? » : consulte les options, répond avec options + justifications, sans chiffre non vérifié, et rappelle que l’étudiant décide', async () => {
+    const llm = scripted([
+      { calls: [{ name: 'get_trading_options' }] },
+      {
+        text:
+          'Oui, tu peux vendre jusqu’à 20 XAU/USD (tu n’en détiens pas plus). Trois options : garder avec un stop-loss, alléger, ou clôturer. ' +
+          'Je garderais en posant un stop, parce que ta position pèse 53,8 % de ton portefeuille sans protection. C’est toi qui décides et qui passes l’ordre.',
+      },
+    ]);
+    const result = await run(llm, 'Est-ce que je peux vendre ?');
+    expect(result.toolsUsed).toEqual(['get_trading_options']);
+    expect(result.unverified).toEqual([]);
+    expect(result.text).toContain('C’est toi qui décides');
+    // Le modèle a bien reçu les options (jamais un ordre exécuté) en retour d'outil.
+    const toolMessage = llm.requests[1]!.messages.at(-1)!;
+    expect(toolMessage).toMatchObject({ role: 'tool', name: 'get_trading_options' });
+    expect(String(toolMessage.content)).toContain('peut_vendre');
+  });
+
+  it('connaît les actifs de la séance sans les demander à l’étudiant', async () => {
+    const llm = scripted([{ text: 'Sur XAU/USD, tu peux entrer en petite quantité avec un stop-loss, ou attendre. C’est toi qui décides.' }]);
+    await runCoachAgent({ llm, toolbox: toolbox(), question: 'Quand dois-je acheter ?', durationMinutes: 30, sessionBrief: 'actifs disponibles : XAU/USD, EUR/USD ; minute actuelle : 14 sur 30.' });
+    const system = llm.requests[0]!.system;
+    expect(system).toContain('SÉANCE EN COURS');
+    expect(system).toContain('actifs disponibles : XAU/USD, EUR/USD');
+    expect(AGENT_SYSTEM_PROMPT).toContain('Ne demande JAMAIS à l\'étudiant quel actif');
+  });
+
+  it('comprend « réponds-moi » comme une demande de répondre soi-même, sans reposer la question', () => {
+    expect(AGENT_SYSTEM_PROMPT).toContain('réponds-moi');
+    expect(AGENT_SYSTEM_PROMPT).toContain('RÉPONDS D\'ABORD, QUESTIONNE ENSUITE');
+  });
+
   it('peut enchaîner plusieurs outils sur plusieurs tours', async () => {
     const llm = scripted([
       { calls: [{ name: 'get_portfolio' }, { name: 'get_events' }] },
