@@ -259,7 +259,6 @@ export default function GameRoomPage() {
 
   useEffect(() => {
     initRoom();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Synchronisation continue du marché et détection des événements diffusés
