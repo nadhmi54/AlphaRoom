@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/useAuth.js';
 import { roleLabel } from '../../data/roles.js';
 import { initialsOf } from '../../utils/initials.js';
+import './UserMenu.css';
 
 // Icône utilisateur de la barre de navigation : ouvre un petit menu pour
 // choisir entre se connecter et créer un compte.

@@ -55,6 +55,24 @@ describe('AiGameRoomService', () => {
     expect((await service.evaluation(student, 'room-1')).message).toContain('pas encore publié');
   });
 
+  it('la projection après choc : null sans choc, sinon éventail + texte, et l’étudiant voit sa position', async () => {
+    const { service } = build();
+    expect(await service.shock(student, 'room-1')).toMatchObject({ role: 'AI Shock Projection', run: 2, projection: null, text: null });
+
+    const shocked: SessionData = {
+      ...session(1),
+      prices: Array.from({ length: 15 }, (_, m) => ({ minute: m, symbol: 'XAU/USD', price: (m < 11 ? 2700 : 2619) + (m % 2) * 3 })),
+      events: [{ id: 'ev-shock', minute: 11, type: 'price_shock', label: 'Choc de prix : -3 %' }],
+    };
+    const provider = new InMemorySessionDataProvider([shocked]);
+    const coach = { ask: vi.fn() };
+    const withShock = new AiGameRoomService(provider, coach as never, {} as never, {} as never);
+    const out = await withShock.shock(student, 'room-1');
+    expect(out.projection?.choc.minute).toBe(11);
+    expect(out.text).toContain('pas une prévision');
+    await expect(withShock.shock(outsider, 'room-1')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
   it('refuse un utilisateur qui ne participe pas à la salle', async () => {
     const { service } = build();
     await expect(service.analyst(outsider, 'room-1')).rejects.toBeInstanceOf(NotFoundException);

@@ -3,7 +3,8 @@ import type { Profile } from '../../users/profile.entity.js';
 import { AiAnalysisService } from '../analysis/ai-analysis.service.js';
 import { AiCoachService } from '../coach/ai-coach.service.js';
 import { SESSION_DATA_PROVIDER, type SessionDataProvider } from '../contract/session-data-provider.js';
-import { listVisibleSessions } from '../sessions/session-access.js';
+import { describeProjection, projectAfterShock } from '../market/shock-projection.js';
+import { isTeacher, listVisibleSessions, loadSession } from '../sessions/session-access.js';
 import { AiReportsService } from '../storage/ai-reports.service.js';
 
 /**
@@ -26,6 +27,25 @@ export class AiGameRoomService {
     const run = await this.latestRun(profile, roomId);
     const result = await this.analysis.marketForParticipant(profile, { sessionId: roomId, run });
     return { role: 'AI Market Analyst', sessionId: roomId, run, ...result };
+  }
+
+  /**
+   * Projection après choc : éventail de trajectoires et scénarios, calculés par le code à partir de la série de la salle.
+   * Pas une prévision. Sans choc récent, `projection` vaut null. L'étudiant voit sa propre position ; l'enseignant, le marché seul.
+   */
+  async shock(profile: Profile, roomId: string) {
+    const run = await this.latestRun(profile, roomId);
+    const session = await loadSession(this.sessions, roomId, run);
+    const participant = session.participants.some((p) => p.id === profile.id);
+    if (!participant && !isTeacher(profile)) throw new NotFoundException('Tu ne participes pas à cette séance.');
+    const projection = projectAfterShock(session, participant ? { participantId: profile.id } : {});
+    return {
+      role: 'AI Shock Projection',
+      sessionId: roomId,
+      run,
+      projection,
+      text: projection ? describeProjection(projection) : null,
+    };
   }
 
   /** Trading Coach : réponse construite sur les ordres réels de l'étudiant. */

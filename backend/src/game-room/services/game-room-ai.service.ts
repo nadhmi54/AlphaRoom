@@ -24,6 +24,10 @@ export class GameRoomAiService {
     return this.ai.analyst(profile, roomId);
   }
 
+  getShockProjection(roomId: string, profile: Profile) {
+    return this.ai.shock(profile, roomId);
+  }
+
   askTradingCoach(roomId: string, profile: Profile, question: string) {
     return this.ai.askCoach(profile, roomId, question);
   }

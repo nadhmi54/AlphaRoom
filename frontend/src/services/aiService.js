@@ -20,6 +20,13 @@ export const editReport = (id, changes) => apiFetch(`/ai/reports/${id}`, { metho
 export const validateReport = (id, publish) =>
   apiFetch(`/ai/reports/${id}/validate`, { method: 'POST', body: { publish } });
 
+// Synthèse de la classe (enseignant), progression d'un étudiant, historique d'un bilan.
+export const getClassSummary = (sessionId, run) => apiFetch('/ai/reports/class-summary', { query: { sessionId, run } });
+
+export const getProgress = (participantId) => apiFetch('/ai/reports/progress', { query: { participantId } });
+
+export const getReportHistory = (id) => apiFetch(`/ai/reports/${id}/history`);
+
 export const getAiUsage = (sessionId) => apiFetch('/ai/reports/usage', { query: { sessionId } });
 
 export const askCoach = (payload) => apiFetch('/ai/coach/ask', { method: 'POST', body: payload });

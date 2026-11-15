@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { MARKET_ASSETS } from '../../data/marketAssets.js';
+import { MarketArt } from '../Art/Art.jsx';
 import './Markets.css';
 
 // Courbe d'illustration déterministe (même courbe à chaque affichage pour un
@@ -140,14 +141,7 @@ export default function Markets() {
               onClick={() => setActiveId(asset.id)}
               onKeyDown={(event) => handleKeyDown(event, index)}
             >
-              <img
-                src={asset.image}
-                alt=""
-                width="560"
-                height="350"
-                loading="lazy"
-                className="ar-markets__tab-img"
-              />
+              <MarketArt asset={asset} className="ar-markets__tab-img" />
               <span className="ar-markets__tab-content">
                 <span className="ar-markets__tab-symbol">{asset.symbol}</span>
                 <span className="ar-markets__tab-name">{asset.name}</span>

@@ -17,6 +17,10 @@ describe('détection de l’intention', () => {
     ['Comment est calculée ma note ?', 'score'],
     ['Je dois acheter ou vendre ?', 'advice'],
     ['Le prix va monter ?', 'advice'],
+    ['Est-ce que je peux acheter ?', 'advice'],
+    ['Puis-je vendre maintenant ?', 'advice'],
+    ['Quand acheter ou vendre ?', 'advice'],
+    ['Je fais quoi maintenant ?', 'advice'],
     ['bonjour', 'overview'],
   ])('« %s » → %s', (question, expected) => {
     expect(detectIntent(question)).toBe(expected);
@@ -57,6 +61,19 @@ describe('réponses construites par le code', () => {
     const answer = buildRuleAnswer(ctx('user-amine'), 'Dois-je vendre maintenant ?');
     expect(answer.intent).toBe('advice');
     expect(answer.text).toContain('Je ne peux pas');
+  });
+
+  it('avec les options calculées, une question d’achat / vente reçoit de l’aide plutôt qu’un refus', () => {
+    const answer = buildRuleAnswer(ctx('user-amine'), 'Puis-je vendre ?', 'Voici ce que tu peux faire. L’étudiant décide.');
+    expect(answer.intent).toBe('advice');
+    expect(answer.text).toContain('Voici ce que tu peux faire');
+    expect(answer.text).not.toContain('Je ne peux pas');
+  });
+
+  it('question ouverte sans ordre passé : donne les options plutôt qu’une impasse', () => {
+    const answer = buildRuleAnswer(ctx('user-lina'), 'réponds moi', 'Voici où tu en es et ce que tu peux faire.');
+    expect(answer.text).toContain('ce que tu peux faire');
+    expect(answer.text).not.toContain('aucun ordre');
   });
 
   it('une étudiante sans ordre : explique qu’il n’y a rien à analyser', () => {

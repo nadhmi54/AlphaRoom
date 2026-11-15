@@ -1,47 +1,41 @@
 // Contenu de la section "Équipe" (#team) de la home page.
-// L'ordre suit celui des photos. `roles` : les profils affichés sous le nom de chaque membre.
+// Chaque membre a un avatar vectoriel (initiales) de sa couleur `accent`. `roles` : les profils affichés sous le nom de chaque membre.
 
 export const TEAM_MEMBERS = [
   {
     id: 'youssef-mellouli',
     name: 'Youssef Mellouli',
-    image: '/images/team/youssef-mellouli.jpg',
     accent: '#d9b877',
     roles: ['Risk Manager', 'Analyste risque bancaire', 'Data Scientist'],
   },
   {
     id: 'nadhmi-rouissi',
     name: 'Nadhmi Rouissi',
-    image: '/images/team/nadhmi-rouissi.jpg',
-    accent: '#818cf8',
+    accent: '#8ea8d0',
     roles: ['Analyste financier', 'Trader', 'Data Scientist', 'AI Engineer'],
   },
   {
     id: 'haroun-chebaane',
     name: 'Haroun Chebaane',
-    image: '/images/team/haroun-chebaane.jpg',
-    accent: '#2dd4bf',
+    accent: '#b9c2d0',
     roles: ['Trader', 'Game Master', 'Analyste financier', 'Formateur'],
   },
   {
     id: 'ghassen-hamdi',
     name: 'Ghassen Hamdi',
-    image: '/images/team/ghassen-hamdi.jpg',
-    accent: '#f472b6',
+    accent: '#c9a36b',
     roles: ['Formateur financier', 'Responsable pédagogique'],
   },
   {
     id: 'safwen-haboubi',
     name: 'Safwen Haboubi',
-    image: '/images/team/safwen-haboubi.jpg',
-    accent: '#34d399',
+    accent: '#9db4c8',
     roles: ['Analyste financier', 'Trader', 'Data Scientist', 'AI Engineer'],
   },
   {
     id: 'chahine-saadellaoui',
     name: 'Chahine Saadellaoui',
-    image: '/images/team/chahine-saadellaoui.jpg',
-    accent: '#fb923c',
+    accent: '#d9b877',
     roles: ['Actuaire', 'Analyste assurance', 'Data Scientist'],
   },
 ];

@@ -223,6 +223,13 @@ export class GameRoomController {
     return this.aiService.getMarketAnalysis(roomId, profile);
   }
 
+  /** IA Projection après choc : éventail de trajectoires et scénarios (pas une prévision). */
+  @Get(':roomId/ai/shock')
+  @Auth()
+  async getAiShockProjection(@CurrentProfile() profile: Profile, @Param('roomId') roomId: string) {
+    return this.aiService.getShockProjection(roomId, profile);
+  }
+
   /** IA Trading Coach : Question-réponse pédagogique individualisée. */
   @Post(':roomId/ai/coach')
   @Auth()

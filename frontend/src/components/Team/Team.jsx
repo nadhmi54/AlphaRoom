@@ -1,4 +1,5 @@
 import { TEAM_MEMBERS, TEAM_STATS } from '../../data/team.js';
+import { MemberArt } from '../Art/Art.jsx';
 import './Team.css';
 
 export default function Team() {
@@ -40,14 +41,7 @@ export default function Team() {
               className="ar-member"
               style={{ '--member-accent': member.accent }}
             >
-              <img
-                className="ar-member__photo"
-                src={member.image}
-                alt={`Portrait de ${member.name}`}
-                width="640"
-                height="800"
-                loading="lazy"
-              />
+              <MemberArt name={member.name} color={member.accent} className="ar-member__photo" />
               <span className="ar-member__index" aria-hidden="true">
                 0{index + 1}
               </span>
