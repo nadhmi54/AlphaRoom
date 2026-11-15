@@ -9,12 +9,12 @@ describe('Team', () => {
     expect(container.querySelector('#team')).not.toBeNull();
   });
 
-  it('affiche chaque membre avec son portrait', () => {
+  it('affiche chaque membre avec son avatar', () => {
     render(<Team />);
     expect(TEAM_MEMBERS).toHaveLength(6);
     TEAM_MEMBERS.forEach((member) => {
       expect(screen.getByRole('heading', { level: 3, name: member.name })).toBeInTheDocument();
-      expect(screen.getByAltText(`Portrait de ${member.name}`)).toBeInTheDocument();
+      expect(screen.getByRole('img', { name: `Avatar de ${member.name}` })).toBeInTheDocument();
     });
   });
 });

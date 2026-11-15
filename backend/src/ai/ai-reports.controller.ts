@@ -6,6 +6,7 @@ import { UserRole } from '../users/user-role.enum.js';
 import {
   EditReportDto,
   GenerateReportDto,
+  ProgressQueryDto,
   ReportIdParams,
   ReportsQueryDto,
   UsageQueryDto,
@@ -37,6 +38,26 @@ export class AiReportsController {
   @Get('usage')
   usage(@CurrentProfile() profile: Profile, @Query() query: UsageQueryDto) {
     return this.service.usageSummary(profile, query.sessionId);
+  }
+
+  /** Avancement et notes de la classe sur un passage. */
+  @Auth(UserRole.GAME_MASTER, UserRole.ADMIN)
+  @Get('class-summary')
+  classSummary(@CurrentProfile() profile: Profile, @Query() query: ReportsQueryDto) {
+    return this.service.classSummary(profile, query);
+  }
+
+  /** Évolution des notes sur les bilans publiés (l'étudiant : les siens). */
+  @Auth()
+  @Get('progress')
+  progress(@CurrentProfile() profile: Profile, @Query() query: ProgressQueryDto) {
+    return this.service.progress(profile, query.participantId);
+  }
+
+  @Auth(UserRole.GAME_MASTER, UserRole.ADMIN)
+  @Get(':id/history')
+  history(@CurrentProfile() profile: Profile, @Param() params: ReportIdParams) {
+    return this.service.history(profile, params.id);
   }
 
   @Auth()

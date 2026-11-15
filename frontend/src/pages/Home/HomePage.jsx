@@ -5,6 +5,7 @@ import AiExplained from '../../components/AiExplained/AiExplained.jsx';
 import Team from '../../components/Team/Team.jsx';
 import Footer from '../../components/Footer/Footer.jsx';
 import BackToTop from '../../components/BackToTop/BackToTop.jsx';
+import './HomePage.css';
 
 export default function HomePage() {
   return (

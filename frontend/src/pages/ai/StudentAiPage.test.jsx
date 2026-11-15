@@ -7,6 +7,7 @@ vi.mock('../../services/aiService.js', () => ({
   listAiSessions: vi.fn(),
   listReports: vi.fn(),
   askCoach: vi.fn(),
+  getProgress: vi.fn(),
 }));
 
 const service = await import('../../services/aiService.js');
@@ -22,6 +23,7 @@ const renderPage = () =>
 describe('StudentAiPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    service.getProgress.mockResolvedValue({ points: [], delta: null, direction: null, criteriaTrends: [], focus: null });
   });
 
   it('affiche le bilan publié avec la règle derrière la note', async () => {

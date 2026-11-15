@@ -111,3 +111,8 @@ export async function askAiTradingCoach(roomId, question) {
 export async function getAiPerformanceEval(roomId) {
   return apiFetch(`/game-room/${roomId}/ai/eval`);
 }
+
+/** Projection IA après un choc de marché : éventail de trajectoires et scénarios (pas une prévision). */
+export async function getAiShockProjection(roomId) {
+  return apiFetch(`/game-room/${roomId}/ai/shock`);
+}

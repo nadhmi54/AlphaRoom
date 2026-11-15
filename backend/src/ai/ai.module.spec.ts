@@ -1,6 +1,6 @@
 import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { AiCoreModule, createSessionDataProvider } from './ai.module.js';
 import {
   SESSION_DATA_PROVIDER,
@@ -52,5 +52,22 @@ describe('AiCoreModule', () => {
 describe('createSessionDataProvider', () => {
   it('ignore toute valeur inconnue : la simulation reste non branchée', async () => {
     await expect(createSessionDataProvider('autre').getSession('a', 1)).rejects.toBeInstanceOf(SessionSourceUnavailableError);
+  });
+
+  it('« game-room » délègue au fournisseur de la Game Room, résolu à l’appel', async () => {
+    const fake = {
+      getSession: async (id: string, run: number) => ({ sessionId: id, run }) as never,
+      listSessions: async () => [{ sessionId: 'r1', title: 'Salle', runs: [1], durationMinutes: 30, symbols: [], participantIds: [] }],
+    };
+    const resolve = vi.fn(() => fake);
+    const provider = createSessionDataProvider('game-room', undefined, resolve);
+    expect(resolve).not.toHaveBeenCalled();
+    expect(await provider.getSession('r1', 1)).toMatchObject({ sessionId: 'r1', run: 1 });
+    expect((await provider.listSessions!())[0]!.sessionId).toBe('r1');
+    expect(resolve).toHaveBeenCalledTimes(2);
+  });
+
+  it('« game-room » sans fournisseur reste non branché', async () => {
+    await expect(createSessionDataProvider('game-room').getSession('a', 1)).rejects.toBeInstanceOf(SessionSourceUnavailableError);
   });
 });

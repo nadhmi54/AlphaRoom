@@ -221,3 +221,118 @@ describe('consommation', () => {
     await expect(service.usageSummary(sarra)).rejects.toBeInstanceOf(ForbiddenException);
   });
 });
+
+describe('synthèse de classe', () => {
+  it('donne l’avancement et les notes de la classe, pour l’enseignant seulement', async () => {
+    const { service } = build();
+    const { reports } = await service.generate(teacher, dto);
+    await service.validate(teacher, reports[0]!.id, true);
+    await service.validate(teacher, reports[1]!.id, false);
+
+    const out = await service.classSummary(teacher, dto);
+    expect(out).toMatchObject({
+      sessionId: 'mardi-panique',
+      run: 1,
+      total: 4,
+      drafts: 2,
+      validatedNotPublished: 1,
+      published: 1,
+      expectedParticipants: 4,
+      withoutReport: 0,
+    });
+    expect(out.overall).not.toBeNull();
+    expect(out.criteria.length).toBeGreaterThan(0);
+    await expect(service.classSummary(sarra, dto)).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('reste disponible quand la simulation n’est pas joignable', async () => {
+    const { service, reports } = build();
+    await service.generate(teacher, dto);
+    const offline = new AiReportsService(reports as never, new FakeRepo() as never, new FakeRepo() as never, new UnconfiguredSessionDataProvider(), new StubLlmProvider(() => ''));
+    const out = await offline.classSummary(teacher, dto);
+    expect(out.total).toBe(4);
+    expect(out.expectedParticipants).toBeNull();
+    expect(out.withoutReport).toBeNull();
+  });
+
+  it('ne compte rien pour une séance sans bilan', async () => {
+    const out = await build().service.classSummary(teacher, { sessionId: 'autre', run: 1 });
+    expect(out).toMatchObject({ total: 0, overall: null });
+  });
+});
+
+describe('progression', () => {
+  async function withTwoPublished() {
+    const ctx = build();
+    const { reports: [first] } = await ctx.service.generate(teacher, { ...dto, participantId: 'user-sarra' });
+    await ctx.service.validate(teacher, first!.id, true);
+    const row = ctx.reports.rows[0]!;
+    // Un second passage publié, plus tard et mieux noté.
+    ctx.reports.rows.push({
+      ...row,
+      id: 'id-run2',
+      run: 2,
+      validatedAt: new Date('2026-12-01T10:00:00Z'),
+      content: { ...row.content, overall: { ...row.content.overall, score: 3.5 } },
+    });
+    return ctx;
+  }
+
+  it('un étudiant voit la progression de ses bilans publiés, dans l’ordre', async () => {
+    const { service } = await withTwoPublished();
+    const out = await service.progress(sarra);
+    expect(out.points).toHaveLength(2);
+    expect(out.points.at(-1)!.reportId).toBe('id-run2');
+    expect(out.direction).not.toBeNull();
+    expect(out.delta).not.toBeNull();
+  });
+
+  it('n’inclut jamais un brouillon ni un bilan non publié', async () => {
+    const { service } = build();
+    await service.generate(teacher, dto);
+    expect((await service.progress(sarra)).points).toEqual([]);
+  });
+
+  it('un étudiant ne peut pas consulter la progression d’un autre', async () => {
+    const { service } = await withTwoPublished();
+    expect((await service.progress(amine, 'user-sarra')).points).toEqual([]);
+  });
+
+  it('l’enseignant doit désigner le participant', async () => {
+    const { service } = await withTwoPublished();
+    await expect(service.progress(teacher)).rejects.toBeInstanceOf(BadRequestException);
+    expect((await service.progress(teacher, 'user-sarra')).points).toHaveLength(2);
+  });
+});
+
+describe('historique des corrections', () => {
+  it('raconte génération, correction et validation, avec ce qui a changé', async () => {
+    const { service } = build();
+    const { reports: [draft] } = await service.generate(teacher, { ...dto, participantId: 'user-amine' });
+    await service.edit(teacher, draft!.id, { summary: 'Revu en classe.', criteria: [{ id: 'gestion_risque', teacherScore: 3 }] });
+    await service.validate(teacher, draft!.id, true);
+
+    const { revisions } = await service.history(teacher, draft!.id);
+    expect(revisions.map((r) => r.kind)).toEqual(['generated', 'edited', 'validated']);
+    expect(revisions[0]!.changes).toEqual([]);
+    const fields = revisions[1]!.changes.map((c) => c.field);
+    expect(fields).toContain('summary');
+    expect(fields).toContain('teacherScore');
+    expect(revisions[1]!.byYou).toBe(true);
+    expect(revisions[2]!.changes).toEqual([]);
+  });
+
+  it('indique qu’une modification ne vient pas de la personne qui consulte', async () => {
+    const { service } = build();
+    const { reports: [draft] } = await service.generate(teacher, { ...dto, participantId: 'user-amine' });
+    const other = profile('autre-prof', UserRole.ADMIN);
+    expect((await service.history(other, draft!.id)).revisions[0]!.byYou).toBe(false);
+  });
+
+  it('est réservé à l’enseignant et répond 404 pour un bilan inconnu', async () => {
+    const { service } = build();
+    const { reports: [draft] } = await service.generate(teacher, { ...dto, participantId: 'user-amine' });
+    await expect(service.history(sarra, draft!.id)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.history(teacher, 'inexistant')).rejects.toBeInstanceOf(NotFoundException);
+  });
+});

@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import HomePage from '../pages/Home/HomePage.jsx';
 import LoadingScreen from '../components/LoadingScreen/LoadingScreen.jsx';
 import RouteLoader from '../components/RouteLoader/RouteLoader.jsx';
@@ -19,6 +19,7 @@ const MarketFeaturePage = lazy(() => import('../pages/portefeuille/market/Market
 
 // Module 2 : Game Room — Salle de simulation pédagogique
 const GameRoomPage = lazy(() => import('../pages/GameRoom/GameRoomPage.jsx'));
+const InsuranceSimulatorPage = lazy(() => import('../pages/assurance/InsuranceSimulatorPage.jsx'));
 
 // Module 3 : Academy — Formation, pédagogie et engagement
 const AcademyCatalogPage = lazy(() => import('../features/academy/pages/AcademyCatalogPage.jsx'));
@@ -50,6 +51,7 @@ const PAGES = [
   { path: '/academy/missions', Page: AcademyMissionsPage, protect: true },
   { path: '/academy/progression', Page: AcademyProgressPage, protect: true },
   { path: '/academy/badges', Page: AcademyBadgesPage, protect: true },
+  { path: '/actuariat', Page: InsuranceSimulatorPage },
 ];
 
 export default function AppRoutes() {
@@ -58,6 +60,7 @@ export default function AppRoutes() {
       <RouteLoader />
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/simulateur-assurance" element={<Navigate to="/actuariat" replace />} />
         {PAGES.map(({ path, Page, protect, roles }) => (
           <Route
             key={path}
