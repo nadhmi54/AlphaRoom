@@ -111,20 +111,20 @@ export default function Markets() {
         <header className="ar-markets__head">
           <span className="ar-markets__pill">
             <span className="ar-markets__pill-dot" />
-            {MARKET_ASSETS.length} classes d&apos;actifs
+            {MARKET_ASSETS.length} marchés
           </span>
           <h2 className="ar-markets__title">
-            Cinq marchés,
+            Quatre marchés,
             <br />
             <span className="ar-markets__title--accent">un seul terrain de jeu.</span>
           </h2>
           <p className="ar-markets__lead">
-            Des métaux précieux aux indices actions : explore chaque marché, comprends ce qui fait
+            Crypto, actions, matières premières et devises : explore chaque marché, comprends ce qui fait
             bouger son prix, puis trade-le sans jamais risquer un centime.
           </p>
         </header>
 
-        <div className="ar-markets__tabs" role="tablist" aria-label="Classes d'actifs">
+        <div className="ar-markets__tabs" role="tablist" aria-label="Marchés financiers">
           {MARKET_ASSETS.map((asset, index) => (
             <button
               key={asset.id}
@@ -162,7 +162,12 @@ export default function Markets() {
         >
           <div className="ar-markets__info">
             <span className="ar-markets__category">{active.category}</span>
-            <h3 className="ar-markets__asset-name">{active.name}</h3>
+            <h3 className="ar-markets__asset-name">
+              {active.name}
+              {active.assetName && (
+                <span className="ar-markets__asset-sub"> ({active.assetName})</span>
+              )}
+            </h3>
 
             <div className="ar-markets__quote">
               <span className="ar-markets__price">{active.price}</span>

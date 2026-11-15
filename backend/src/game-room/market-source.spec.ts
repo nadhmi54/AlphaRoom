@@ -161,3 +161,28 @@ describe('Game Room - Comptabilité sur marge', () => {
     expect(recomputeTotalSimSeconds(room({ sourceMode: 'live', durationMinutes: 15, playbackSpeed: '9' }))).toBe(900);
   });
 });
+
+describe('Game Room - Chocs de marché multi-actifs', () => {
+  it('isole les chocs par actif : un choc sur XAU/USD n\'impacte pas AAPL', async () => {
+    const service = source();
+    const testRoom = room({
+      id: 'room-multi',
+      assets: ['XAU/USD', 'AAPL'],
+      sourceMode: 'synthetic',
+      sourceConfig: {
+        initialPrice: 2000,
+      },
+    });
+
+    service.setShocks('room-multi', { priceOffset: -100, spreadMultiplier: 4, liquidityFactor: 0.25 }, 'XAU/USD');
+
+    const goldState = await service.getMarketState(testRoom, 'XAU/USD');
+    const aaplState = await service.getMarketState(testRoom, 'AAPL');
+
+    expect(goldState.shocks.priceOffset).toBe(-100);
+    expect(goldState.shocks.spreadMultiplier).toBe(4);
+    expect(aaplState.shocks.priceOffset).toBe(0);
+    expect(aaplState.shocks.spreadMultiplier).toBe(1);
+    expect(aaplState.shocks.liquidityFactor).toBe(1);
+  });
+});

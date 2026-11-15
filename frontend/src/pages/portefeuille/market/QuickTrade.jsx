@@ -165,7 +165,7 @@ export default function QuickTrade({ symbol, unit, price, account, onExecuted, o
       )}
 
       <button type="submit" className="qt-submit" disabled={!canSubmit}>
-        {submitting ? "Envoi…" : `${side === "buy" ? "Acheter" : "Vendre"} ${symbol}`}
+        {submitting ? "Envoi…" : symbol ? `${side === "buy" ? "Acheter" : "Vendre"} ${symbol}` : "Choisis un actif"}
       </button>
       <p className="qt-hint">Exécution immédiate contre le carnet. Pour fixer ton prix, utilise l’ordre limite plus bas.</p>
     </form>

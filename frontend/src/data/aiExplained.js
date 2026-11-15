@@ -53,8 +53,8 @@ export const AI_PRINCIPLES = [
 // Exemple illustratif affiché dans la carte "Pourquoi cette recommandation ?".
 // `weight` > 0 pousse vers l'achat, < 0 pousse vers la prudence.
 export const AI_EXAMPLE = {
-  symbol: 'XAU/USD',
-  name: 'Or',
+  symbol: 'Actif',
+  name: 'Marché',
   signal: 'Achat',
   confidence: 78,
   factors: [

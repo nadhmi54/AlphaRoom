@@ -132,6 +132,7 @@ function FanChart({ projection }) {
  */
 export default function ShockProjectionPanel({ roomId }) {
   const [data, setData] = useState(null);
+  const [selectedShockId, setSelectedShockId] = useState(null);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState('');
   const seenShock = useRef(null);
@@ -141,14 +142,18 @@ export default function ShockProjectionPanel({ roomId }) {
     let alive = true;
     async function load() {
       try {
-        const result = await getAiShockProjection(roomId);
+        const result = selectedShockId
+          ? await getAiShockProjection(roomId, selectedShockId)
+          : await getAiShockProjection(roomId);
         if (!alive) return;
         setError('');
         setData(result);
-        const shockId = result?.projection?.choc?.id ?? null;
+        const latestId = result?.shocks?.at(-1)?.id || result?.projection?.choc?.id || null;
         // Un nouveau choc ouvre le panneau automatiquement : c'est le moment utile.
-        if (shockId && shockId !== seenShock.current && result.projection.choc.recent) setOpen(true);
-        seenShock.current = shockId;
+        if (latestId && latestId !== seenShock.current && result.projection?.choc?.recent) {
+          setOpen(true);
+        }
+        seenShock.current = latestId;
       } catch (e) {
         if (alive) setError(e.message || 'Projection indisponible.');
       }
@@ -159,29 +164,71 @@ export default function ShockProjectionPanel({ roomId }) {
       alive = false;
       clearInterval(timer);
     };
-  }, [roomId]);
+  }, [roomId, selectedShockId]);
 
   const projection = data?.projection;
   if (!projection) return error ? <p className="shock__error" role="alert">{error}</p> : null;
 
   const { choc, probabilites, volatilite, ta_position: position } = projection;
   const down = choc.variation_pct < 0;
+  const rawShocks = data?.shocks?.length ? data.shocks : [
+    { id: choc.id, minute: choc.minute, type: choc.type, label: choc.titre },
+  ];
+  const shocks = [...rawShocks].sort((a, b) => a.minute - b.minute);
+  const currentIndex = shocks.findIndex((s) => s.id === choc.id);
+  const isLatest = currentIndex === shocks.length - 1 || (!selectedShockId && currentIndex === -1);
 
   return (
     <section className="shock" aria-label="Projection IA après le choc">
       <button type="button" className="shock__toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
         <span className="shock__title">
-          <span className={`shock__badge ${choc.recent ? 'shock__badge--live' : ''}`}>{choc.recent ? 'Choc récent' : 'Dernier choc'}</span>
+          <span className={`shock__badge ${choc.recent ? 'shock__badge--live' : ''}`}>
+            {isLatest ? (choc.recent ? 'Choc récent' : 'Dernier choc') : `Choc #${currentIndex + 1} (min ${choc.minute})`}
+          </span>
           Après le choc · {projection.actif}{' '}
           <span className={down ? 'shock__down' : 'shock__up'}>
             {down ? '▼' : '▲'} {fr(Math.abs(choc.variation_pct))} %
           </span>
+          {shocks.length > 1 && (
+            <span className="shock__counter-badge">
+              Choc {currentIndex >= 0 ? currentIndex + 1 : 1} / {shocks.length}
+            </span>
+          )}
         </span>
         <span aria-hidden="true">{open ? '−' : '+'}</span>
       </button>
 
       {open && (
         <div className="shock__body">
+          {/* Sélecteur de choc si plusieurs chocs ont eu lieu */}
+          {shocks.length > 1 && (
+            <div className="shock__switcher" role="tablist" aria-label="Historique des chocs">
+              <span className="shock__switcher-title">Chocs survenus ({shocks.length}) :</span>
+              <div className="shock__pills">
+                {shocks.map((s, idx) => {
+                  const isActive = (choc.id === s.id) || (!selectedShockId && idx === shocks.length - 1);
+                  const isLastShock = idx === shocks.length - 1;
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={isActive}
+                      className={`shock__pill ${isActive ? 'is-active' : ''}`}
+                      onClick={() => setSelectedShockId(s.id)}
+                      title={s.label}
+                    >
+                      <span className="shock__pill-num">#{idx + 1}</span>
+                      <span className="shock__pill-minute">Min {s.minute}</span>
+                      <span className="shock__pill-label">{s.label}</span>
+                      {isLastShock && <span className="shock__pill-tag">Dernier</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <p className="shock__lead">
             Minute {choc.minute} : « {choc.titre} ». Voici la fourchette du prix pour les {projection.horizon_minutes} prochaines minutes, selon la volatilité mesurée dans la salle.
           </p>

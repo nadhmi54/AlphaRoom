@@ -1893,3 +1893,225 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ==========================================================================
+   LOBBY TRADER — Sélection de la salle avant d'entrer
+   ========================================================================== */
+
+.gr-trader-lobby {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding: 32px 0;
+  animation: gr-fade-in 0.35s ease;
+}
+
+@keyframes gr-fade-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.gr-trader-lobby__header {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.gr-trader-lobby__title {
+  font: 700 28px 'Space Grotesk', sans-serif;
+  color: #eef1f7;
+  margin: 0;
+}
+
+.gr-trader-lobby__subtitle {
+  font-size: 15px;
+  color: #8892a5;
+  max-width: 540px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Grille des cartes de salles */
+.gr-trader-lobby__rooms {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.gr-trader-lobby__room-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px 20px 16px;
+  background: rgba(14, 18, 30, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+  color: #eef1f7;
+  position: relative;
+  overflow: hidden;
+}
+
+.gr-trader-lobby__room-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(63, 209, 160, 0.04) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.gr-trader-lobby__room-card:hover {
+  border-color: #3fd1a0;
+  background: rgba(63, 209, 160, 0.06);
+  transform: translateY(-2px);
+}
+
+.gr-trader-lobby__room-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.gr-trader-lobby__room-tag {
+  font: 600 11px 'JetBrains Mono', monospace;
+  letter-spacing: 0.5px;
+  color: #d9b877;
+  background: rgba(217, 184, 119, 0.1);
+  border: 1px solid rgba(217, 184, 119, 0.25);
+  border-radius: 6px;
+  padding: 2px 8px;
+}
+
+.gr-trader-lobby__room-name {
+  font: 700 18px 'Space Grotesk', sans-serif;
+  color: #eef1f7;
+}
+
+.gr-trader-lobby__room-desc {
+  font-size: 13px;
+  color: #8892a5;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.gr-trader-lobby__room-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 12px;
+  color: #6b7694;
+}
+
+.gr-trader-lobby__room-meta span {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  padding: 3px 10px;
+}
+
+.gr-trader-lobby__room-code {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #8892a5;
+  margin-top: 4px;
+}
+
+.gr-trader-lobby__room-code strong {
+  font: 700 14px 'JetBrains Mono', monospace;
+  color: #3fd1a0;
+  letter-spacing: 1px;
+}
+
+.gr-trader-lobby__copy-btn {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(63, 209, 160, 0.3);
+  background: rgba(63, 209, 160, 0.08);
+  color: #3fd1a0;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.gr-trader-lobby__copy-btn:hover {
+  background: rgba(63, 209, 160, 0.18);
+}
+
+.gr-trader-lobby__room-enter {
+  font: 600 13px 'Space Grotesk', sans-serif;
+  color: #3fd1a0;
+  margin-top: auto;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.gr-trader-lobby__room-card:hover .gr-trader-lobby__room-enter {
+  opacity: 1;
+}
+
+/* Zone rejoindre avec un code */
+.gr-trader-lobby__join-panel {
+  background: rgba(14, 18, 30, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 28px 28px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.gr-trader-lobby__join-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gr-trader-lobby__join-header p {
+  font-size: 14px;
+  color: #8892a5;
+  margin: 0;
+}
+
+.gr-trader-lobby__join-form {
+  width: 100%;
+}
+
+.gr-trader-lobby__join-fields {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.gr-trader-lobby__code-input {
+  flex: 1 1 180px;
+  font: 700 15px 'JetBrains Mono', monospace;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.gr-trader-lobby__nick-input {
+  flex: 1 1 160px;
+}
+
+.gr-trader-lobby__join-btn {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+@media (max-width: 600px) {
+  .gr-trader-lobby__join-fields {
+    flex-direction: column;
+  }
+  .gr-trader-lobby__join-btn {
+    width: 100%;
+  }
+}
