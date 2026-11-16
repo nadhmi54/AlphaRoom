@@ -1,0 +1,63 @@
+/* AlphaRoom — design tokens (source unique des couleurs, rayons, ombres, polices).
+   Direction : navy profond + or ; vert/rouge réservés aux gains/pertes. */
+:root {
+  /* surfaces */
+  --ar-bg: #05070f;
+  --ar-bg-1: #090d19;
+  --ar-bg-2: #0e1424;
+  --ar-bg-3: #141b30;
+  --ar-bg-elevated: #0b1120;
+  --ar-surface: rgba(255, 255, 255, 0.035);
+  --ar-surface-hover: rgba(255, 255, 255, 0.06);
+
+  /* traits */
+  --ar-line: rgba(255, 255, 255, 0.08);
+  --ar-line-strong: rgba(255, 255, 255, 0.16);
+
+  /* texte */
+  --ar-text: #f2f4f8;
+  --ar-text-dim: #9aa3b6;
+  --ar-text-faint: #6b7385;
+
+  /* marque */
+  --ar-accent: #d9b877;
+  --ar-accent-strong: #ecd197;
+  --ar-accent-ink: #1a1305;
+  --ar-accent-soft: rgba(217, 184, 119, 0.14);
+  --ar-accent-line: rgba(217, 184, 119, 0.45);
+  --ar-accent-2: #3fd1a0;
+  --ar-accent-2-soft: rgba(63, 209, 160, 0.13);
+  --ar-indigo: #7c83f5;
+
+  /* sémantique marché */
+  --ar-up: #3fd1a0;
+  --ar-up-soft: rgba(63, 209, 160, 0.13);
+  --ar-down: #ff6b7a;
+  --ar-down-soft: rgba(255, 107, 122, 0.13);
+  --ar-green: var(--ar-up);
+  --ar-red: var(--ar-down);
+  --ar-warn: #f5b94a;
+
+  /* forme */
+  --ar-radius-sm: 10px;
+  --ar-radius: 14px;
+  --ar-radius-lg: 20px;
+  --ar-shadow-1: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 8px 24px rgba(0, 0, 0, 0.35);
+  --ar-shadow-2: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 24px 60px rgba(0, 0, 0, 0.5);
+  --ar-glow-gold: 0 0 0 1px var(--ar-accent-line), 0 10px 40px rgba(217, 184, 119, 0.18);
+  --ar-ring: 0 0 0 3px rgba(217, 184, 119, 0.28);
+
+  /* typo */
+  --ar-font: 'Space Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --ar-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+  /* mouvement */
+  --ar-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ar-fast: 0.16s;
+  --ar-med: 0.28s;
+
+  /* hauteur de la barre d'application */
+  --ar-appbar-h: 64px;
+
+  color-scheme: dark;
+}

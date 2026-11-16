@@ -189,7 +189,7 @@ export default function OrderBookPanel({ symbol, assets = [], onSymbolChange, on
       <header className="ob-header">
         <div>
           <span className="ob-eyebrow">CARNET D’ORDRES</span>
-          <h3>{book?.name ?? symbol} · {symbol}</h3>
+          <h3>{symbol ? `${book?.name ?? symbol} · ${symbol}` : "Aucun actif sélectionné"}</h3>
         </div>
         <span className={`ob-live${book ? "" : " is-offline"}`} title={`Rafraîchissement toutes les ${BOOK_REFRESH_MS / 1000} secondes`}>
           <span className="ob-dot" aria-hidden="true" />
@@ -200,7 +200,11 @@ export default function OrderBookPanel({ symbol, assets = [], onSymbolChange, on
 
       {error && <p className="ob-message ob-message--error" role="alert">{error}</p>}
 
-      {!book && !error && <p className="ob-message">Chargement du carnet…</p>}
+      {!book && !error && (
+        <p className="ob-message">
+          {symbol ? "Chargement du carnet…" : "Choisis un actif pour afficher son carnet d’ordres."}
+        </p>
+      )}
 
       {book && (
         <>

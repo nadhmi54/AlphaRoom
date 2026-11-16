@@ -352,6 +352,10 @@ export class GameMasterActionDto {
   @IsOptional()
   description?: string;
 
+  @IsString()
+  @IsOptional()
+  symbol?: string;
+
   @IsOptional()
   payload?: Record<string, any>;
 }

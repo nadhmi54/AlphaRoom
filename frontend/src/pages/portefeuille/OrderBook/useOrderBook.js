@@ -31,6 +31,14 @@ export function useOrderBook(symbol) {
 
   const load = useCallback(
     async ({ quiet = false } = {}) => {
+      if (!symbol) {
+        // Aucun actif choisi : on vide l'affichage sans interroger l'API.
+        setBook(null);
+        setOrders([]);
+        setError("");
+        setLoading(false);
+        return;
+      }
       if (inFlight.current) return;
       inFlight.current = true;
       if (!quiet) setLoading(true);

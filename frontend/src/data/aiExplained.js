@@ -33,28 +33,19 @@ export const AI_PRINCIPLES = [
   {
     id: 'transparente',
     title: 'Transparente',
-    image: '/images/ai/ai-transparente.jpg',
-    imageAlt: "Une main qui touche une sphère de données d'intelligence artificielle",
-    position: '30% 55%',
-    accent: '#f472b6',
+    accent: '#d9b877',
     description: 'Chaque décision est justifiée, tu vois ce qui a pesé dans la balance.',
   },
   {
     id: 'verifiable',
     title: 'Vérifiable',
-    image: '/images/ai/ai-verifiable.jpg',
-    imageAlt: "Un bouclier « Ai » entouré de coches de validation et d'alertes",
-    position: '50% 40%',
-    accent: '#2dd4bf',
+    accent: '#8ea8d0',
     description: "Une recommandation est testée sur l'historique avant d'être suivie.",
   },
   {
     id: 'pedagogique',
     title: 'Pédagogique',
-    image: '/images/ai/ai-pedagogique.jpg',
-    imageAlt: 'Un cerveau numérique qui projette des graphiques explicatifs',
-    position: '40% 50%',
-    accent: '#818cf8',
+    accent: '#b9c2d0',
     description: 'Comprendre le pourquoi, c’est apprendre à décider par soi-même.',
   },
 ];
@@ -62,8 +53,8 @@ export const AI_PRINCIPLES = [
 // Exemple illustratif affiché dans la carte "Pourquoi cette recommandation ?".
 // `weight` > 0 pousse vers l'achat, < 0 pousse vers la prudence.
 export const AI_EXAMPLE = {
-  symbol: 'XAU/USD',
-  name: 'Or',
+  symbol: 'Actif',
+  name: 'Marché',
   signal: 'Achat',
   confidence: 78,
   factors: [

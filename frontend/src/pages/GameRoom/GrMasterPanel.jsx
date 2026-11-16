@@ -22,6 +22,8 @@ export default function GrMasterPanel({
 
   const status = room?.status || 'waiting';
   const totalSeconds = room?.totalSimSeconds || 1800;
+  // Chocs et rollback n'ont de sens que sur les sources dont le maître pilote le prix.
+  const shockableSource = room?.sourceMode === 'synthetic' || room?.sourceMode === 'live';
 
   // Le curseur suit la séance, sauf pendant que l'enseignant le déplace.
   useEffect(() => {
@@ -34,9 +36,9 @@ export default function GrMasterPanel({
     if (!customNews.trim()) return;
     onTriggerAction({
       type: 'NEWS',
-      title: 'COMMUNIQUÉ FLASH',
+      title: `COMMUNIQUÉ FLASH · ${symbol}`,
       description: customNews,
-      payload: { custom: true },
+      payload: { custom: true, symbol },
     });
     setCustomNews('');
   };
@@ -223,10 +225,11 @@ export default function GrMasterPanel({
 
       <div className="gr-master-grid">
         {/* Déclenchement d'événements et de chocs */}
+        {shockableSource && (
         <div className="gr-master-box">
           <h4>Déclencher des chocs de marché</h4>
           <p className="gr-master-desc">
-            Injecte des variations instantanées dans le moteur de simulation partagé par tous les étudiants.
+            Injecte des variations instantanées sur l&apos;actif sélectionné (<strong>{symbol}</strong>) dans le moteur de simulation partagé par tous les étudiants.
           </p>
 
           <div className="gr-shocks-grid">
@@ -236,9 +239,9 @@ export default function GrMasterPanel({
               onClick={() =>
                 onTriggerAction({
                   type: 'PRICE_SHOCK',
-                  title: 'CHOC DE PRIX BAISSIER (-3%)',
-                  description: 'Chute brutale de -3% du cours de l’or simulant des ventes massives.',
-                  payload: { percent: 3 },
+                  title: `CHOC DE PRIX BAISSIER (-3%) · ${symbol}`,
+                  description: `Chute brutale de -3% sur ${symbol} simulant des ventes massives.`,
+                  payload: { percent: 3, symbol },
                 })
               }
             >
@@ -251,9 +254,9 @@ export default function GrMasterPanel({
               onClick={() =>
                 onTriggerAction({
                   type: 'SPREAD_SHOCK',
-                  title: 'ÉLARGISSEMENT DU SPREAD',
-                  description: 'Multiplication du spread par 4 pour pénaliser les ordres au marché.',
-                  payload: { multiplier: 4.0 },
+                  title: `ÉLARGISSEMENT DU SPREAD · ${symbol}`,
+                  description: `Multiplication du spread par 4 sur ${symbol} pour pénaliser les ordres au marché.`,
+                  payload: { multiplier: 4.0, symbol },
                 })
               }
             >
@@ -266,9 +269,9 @@ export default function GrMasterPanel({
               onClick={() =>
                 onTriggerAction({
                   type: 'LIQUIDITY_SHOCK',
-                  title: 'CHOC DE LIQUIDITÉ',
-                  description: 'Division par 4 de la profondeur du carnet, créant un slippage élevé.',
-                  payload: { factor: 0.25 },
+                  title: `CHOC DE LIQUIDITÉ · ${symbol}`,
+                  description: `Division par 4 de la profondeur du carnet sur ${symbol}, créant un slippage élevé.`,
+                  payload: { factor: 0.25, symbol },
                 })
               }
             >
@@ -281,13 +284,13 @@ export default function GrMasterPanel({
               onClick={() =>
                 onTriggerAction({
                   type: 'WHALE',
-                  title: 'GROS ORDRE INSTITUTIONNEL (WHALE)',
-                  description: 'Injection d’un ordre de 500 onces à la vente dans le carnet.',
-                  payload: { quantity: 500 },
+                  title: `ORDRE INSTITUTIONNEL (WHALE) · ${symbol}`,
+                  description: `Injection d’un ordre massif de vente sur ${symbol} dans le carnet.`,
+                  payload: { quantity: 500, symbol },
                 })
               }
             >
-              🐋 Ordre Whale (Vente 500 oz)
+              🐋 Ordre Whale
             </button>
           </div>
 
@@ -295,7 +298,7 @@ export default function GrMasterPanel({
           <form className="gr-news-form" onSubmit={handleNewsSubmit}>
             <input
               type="text"
-              placeholder="Diffuser une actualité fictive aux étudiants (ex: Annonce Fed)..."
+              placeholder={`Diffuser une actualité sur ${symbol} ou la séance...`}
               value={customNews}
               onChange={(e) => setCustomNews(e.target.value)}
               className="gr-input"
@@ -305,8 +308,10 @@ export default function GrMasterPanel({
             </button>
           </form>
         </div>
+        )}
 
         {/* Retour en arrière (Rollback & Replay) */}
+        {shockableSource && (
         <div className="gr-master-box gr-master-box--rollback">
           <h4>Retour en arrière (Rollback & Replay)</h4>
           <p className="gr-master-desc">
@@ -424,6 +429,7 @@ export default function GrMasterPanel({
             Le rollback purge les ordres et transactions postérieurs et recalcule le cash de chaque étudiant à cet instant précis.
           </small>
         </div>
+        )}
       </div>
 
       {/* Leaderboard des participants connectés */}

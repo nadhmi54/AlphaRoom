@@ -10,6 +10,8 @@ vi.mock('../../services/aiService.js', () => ({
   editReport: vi.fn(),
   validateReport: vi.fn(),
   getAiUsage: vi.fn(),
+  getClassSummary: vi.fn(),
+  getReportHistory: vi.fn(),
   analyzeMarket: vi.fn(),
   analyzeReplay: vi.fn(),
 }));
@@ -30,6 +32,27 @@ describe('TeacherAiPage', () => {
     service.listAiSessions.mockResolvedValue([demoSession]);
     service.listReports.mockResolvedValue([sampleReport()]);
     service.getAiUsage.mockResolvedValue({ calls: 4, inputTokens: 1200, outputTokens: 80 });
+    service.getClassSummary.mockResolvedValue({
+      total: 1,
+      drafts: 1,
+      validatedNotPublished: 0,
+      published: 0,
+      expectedParticipants: 4,
+      withoutReport: 3,
+      outOf: 4,
+      overall: { count: 1, mean: 2.5, median: 2.5, min: 2.5, max: 2.5 },
+      distribution: [{ from: 0, to: 1, count: 0 }, { from: 1, to: 2, count: 0 }, { from: 2, to: 3, count: 1 }, { from: 3, to: 4, count: 0 }],
+      criteria: [],
+      weakest: null,
+      strongest: null,
+    });
+  });
+
+  it('affiche la synthèse de la classe au-dessus des bilans', async () => {
+    renderPage();
+    expect(await screen.findByLabelText('Synthèse de la classe')).toBeInTheDocument();
+    expect(screen.getByText('3 sans bilan')).toBeInTheDocument();
+    expect(service.getClassSummary).toHaveBeenCalledWith('mardi-panique', 2);
   });
 
   it('charge la séance, son dernier passage et les bilans', async () => {

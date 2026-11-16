@@ -34,7 +34,7 @@ const INTENTS: Array<[CoachIntent, RegExp]> = [
   // Les demandes d'avis d'investissement passent en premier : on ne les traite jamais comme une autre question.
   [
     'advice',
-    /\b(achete|acheter|vends|vendre|dois[- ]je (?:acheter|vendre)|faut[- ]il (?:acheter|vendre)|va (?:monter|baisser)|prevision|predire|prediction|conseille|que faire)\b/,
+    /\b(achete|acheter|vends|vendre|dois[- ]je (?:acheter|vendre)|faut[- ]il (?:acheter|vendre)|(?:puis|peux)[- ]je (?:acheter|vendre|entrer|sortir)|je peux (?:acheter|vendre)|quand (?:acheter|vendre|entrer|sortir)|va (?:monter|baisser)|prevision|predire|prediction|conseille|que faire|quoi faire|je fais quoi)\b/,
   ],
   ['protection', /\b(stop|protection|take[- ]?profit|limite de perte)\b/],
   ['reaction', /\b(reagi|reaction|news|actualite|information|evenement|choc|delai)\b/],
@@ -53,20 +53,25 @@ const signedPct = (fraction: number) => `${fraction < 0 ? '−' : '+'}${pct(frac
 const money = (value: number) => `${formatNumber(Math.abs(value), 0).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} $`;
 
 /** Réponse pédagogique construite uniquement à partir des métriques du contexte. */
-export function buildRuleAnswer(context: ParticipantContext, question: string): CoachAnswer {
+export function buildRuleAnswer(context: ParticipantContext, question: string, optionsText?: string): CoachAnswer {
   const m = context.participant;
   const intent = detectIntent(question);
 
   if (intent === 'advice') {
+    // Sans modèle, le code donne quand même de l'aide : ce que l'étudiant peut faire, avec les raisons. Il décide.
+    if (optionsText) return { intent, evidence: [], text: optionsText };
     return {
       intent,
       evidence: [],
       text:
-        'Je ne peux pas te dire quoi acheter ou vendre, ni prévoir l’évolution des prix : je suis là pour t’aider à comprendre. ' +
-        'Pour décider toi-même, regarde ton exposition (quelle part de ton capital est investie), ta protection (as-tu un stop-loss ?) ' +
-        'et la réaction du marché aux événements. Pose-moi une question sur l’un de ces points et je te l’explique avec tes propres chiffres.',
+        'Je ne peux pas te donner d’avis argumenté pour l’instant (le modèle d’IA n’est pas disponible ou pas configuré) : réessaie dans un instant. ' +
+        'En attendant, regarde ton exposition (quelle part de ton capital est investie), ta protection (as-tu un stop-loss ?) ' +
+        'et la réaction du marché aux événements : la décision de vendre ou de garder passe par là.',
     };
   }
+
+  // Question ouverte (« réponds-moi », « et maintenant ? ») sans ordre passé : plutôt qu'une impasse, on dit ce qu'il peut faire.
+  if (intent === 'overview' && optionsText) return { intent, evidence: [], text: optionsText };
 
   if (m.tradeCount === 0 || m.missingData.includes('no_trades')) {
     return {

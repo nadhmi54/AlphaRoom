@@ -6,15 +6,17 @@ import { MODULES } from '../../data/modules.js';
 
 describe('Features', () => {
   it('affiche une carte par module', () => {
-    render(
+    const { container } = render(
       <MemoryRouter>
         <Features />
       </MemoryRouter>,
     );
-    expect(MODULES).toHaveLength(2);
+    expect(MODULES).toHaveLength(3);
     MODULES.forEach((module) => {
       expect(screen.getByText(module.title)).toBeInTheDocument();
     });
+    expect(container.querySelector('a[href="/actuariat"]')).not.toBeNull();
+    expect(screen.getByText(MODULES.find((module) => module.id === 'actuariat').description)).toBeInTheDocument();
   });
 
   it('expose la section #features pour la navigation', () => {

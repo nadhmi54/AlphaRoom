@@ -4,6 +4,11 @@ export async function getDemoRoom() {
   return apiFetch('/game-room/demo');
 }
 
+// Toutes les salles de simulation accessibles aux traders / élèves.
+export async function getAllGameRooms() {
+  return apiFetch('/game-room/all');
+}
+
 // Salles créées par le Meneur de Jeu connecté.
 export async function getMyRooms() {
   return apiFetch('/game-room/mine');
@@ -110,4 +115,11 @@ export async function askAiTradingCoach(roomId, question) {
 
 export async function getAiPerformanceEval(roomId) {
   return apiFetch(`/game-room/${roomId}/ai/eval`);
+}
+
+/** Projection IA après un choc de marché : éventail de trajectoires et scénarios (pas une prévision). */
+export async function getAiShockProjection(roomId, shockId) {
+  return apiFetch(`/game-room/${roomId}/ai/shock`, {
+    query: shockId ? { shockId } : undefined,
+  });
 }

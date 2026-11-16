@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import ReportEditor from './ReportEditor.jsx';
 import { formatScore, statusLabel } from './aiLabels.js';
 import { generateReports, listReports } from '../../services/aiService.js';
+import { DocIcon } from './AiSteps.jsx';
+import ClassSummaryPanel from './ClassSummaryPanel.jsx';
 
 /** Liste des bilans d'un passage + génération des brouillons + édition. */
 export default function ReportsTab({ sessionId, run }) {
@@ -52,8 +54,13 @@ export default function ReportsTab({ sessionId, run }) {
   const replace = (updated) => setReports((current) => current.map((r) => (r.id === updated.id ? updated : r)));
   const selected = reports.find((r) => r.id === selectedId);
 
+  // La synthèse se recalcule quand un bilan change d'état ou de contenu.
+  const summaryKey = reports.map((r) => `${r.id}:${r.status}:${r.published}:${r.updatedAt}`).join('|');
+
   return (
     <div>
+      <ClassSummaryPanel sessionId={sessionId} run={run} refreshKey={summaryKey} />
+
       <div className="ai-toolbar">
         <p className="ai-muted">
           L’IA prépare un <strong>brouillon</strong> par étudiant ; les notes viennent du barème, jamais du modèle. Rien n’est visible par
@@ -103,6 +110,7 @@ export default function ReportsTab({ sessionId, run }) {
             {!loading && reports.length === 0 && (
               <tr>
                 <td colSpan={5} className="ai-empty">
+                  <DocIcon />
                   Aucun bilan pour ce passage. Clique sur « Générer les bilans ».
                 </td>
               </tr>

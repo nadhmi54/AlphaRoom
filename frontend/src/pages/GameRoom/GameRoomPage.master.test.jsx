@@ -10,6 +10,7 @@ import {
   getGameRoomDashboard,
   getMyRooms,
   setRoomSpeed,
+  triggerGameMasterAction,
 } from '../../services/gameRoomService.js';
 
 vi.mock('../../context/useAuth.js', () => ({
@@ -108,6 +109,7 @@ const MY_ROOMS = [
 
 vi.mock('../../services/gameRoomService.js', () => ({
   getMyRooms: vi.fn(),
+  getAllGameRooms: vi.fn().mockResolvedValue({ rooms: [] }),
   getDemoRoom: vi.fn(),
   getGameRoomDetails: vi.fn(),
   getGameRoomPortfolio: vi.fn().mockResolvedValue({
@@ -158,6 +160,9 @@ describe('GameRoomPage — Meneur de Jeu', () => {
 
     // La salle « en cours » est chargée en priorité
     await waitFor(() => expect(getGameRoomDetails).toHaveBeenCalledWith('room-1', undefined));
+
+    // Le bouton « Rejoindre une autre salle » ne doit PAS être visible pour le Game Master
+    expect(screen.queryByText(/Rejoindre une autre salle/i)).not.toBeInTheDocument();
   });
 
   it('affiche le panneau enseignant avec la configuration, la vitesse et la timeline', async () => {
@@ -200,6 +205,27 @@ describe('GameRoomPage — Meneur de Jeu', () => {
 
     await waitFor(() => expect(getGameRoomDetails).toHaveBeenCalledWith('room-2', undefined));
     await waitFor(() => expect(getGameRoomDashboard).toHaveBeenCalledWith('room-2'));
+  });
+
+  it('déclenche un choc ciblant uniquement l’actif sélectionné', async () => {
+    renderPage();
+
+    const shockBtn = await screen.findByRole('button', { name: /Choc de Prix \(-3%\)/i });
+    fireEvent.click(shockBtn);
+
+    await waitFor(() =>
+      expect(triggerGameMasterAction).toHaveBeenCalledWith(
+        'room-1',
+        expect.objectContaining({
+          type: 'PRICE_SHOCK',
+          symbol: 'XAU/USD',
+          payload: expect.objectContaining({
+            symbol: 'XAU/USD',
+            percent: 3,
+          }),
+        }),
+      ),
+    );
   });
 
   it('ouvre l’assistant de création de salle', async () => {
