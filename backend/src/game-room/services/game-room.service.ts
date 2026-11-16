@@ -338,8 +338,12 @@ export class GameRoomService {
    * Rejoindre une salle avec son code ou son ID.
    */
   async joinRoom(codeOrId: string, userId: string, nickname: string) {
+    // `id` est un uuid : le comparer à un code court (« GSX9PP ») ferait échouer la requête (500).
+    const looksLikeId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(codeOrId.trim());
     const room = await this.rooms.findOne({
-      where: [{ joinCode: codeOrId.toUpperCase() }, { id: codeOrId }],
+      where: looksLikeId
+        ? [{ joinCode: codeOrId.trim().toUpperCase() }, { id: codeOrId.trim() }]
+        : [{ joinCode: codeOrId.trim().toUpperCase() }],
     });
     if (!room) {
       throw new NotFoundException('Salle de simulation introuvable avec ce code.');

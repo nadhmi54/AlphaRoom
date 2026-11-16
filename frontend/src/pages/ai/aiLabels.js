@@ -58,3 +58,39 @@ export const VERDICT_LABELS = {
   worsened: 'En baisse',
   not_comparable: 'Non comparable',
 };
+
+/* ---- Historique des corrections ---- */
+
+export const REVISION_LABELS = {
+  generated: 'Brouillon généré',
+  edited: 'Corrigé par l’enseignant',
+  validated: 'Validé et publié',
+  unpublished: 'Validé, non publié',
+};
+
+export const revisionLabel = (kind) => REVISION_LABELS[kind] ?? kind;
+
+const shorten = (text, max = 70) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
+
+/** Phrase lisible pour un changement renvoyé par GET /ai/reports/:id/history. */
+export function describeChange(change) {
+  switch (change.field) {
+    case 'summary':
+      return `Synthèse modifiée : « ${shorten(change.to)} »`;
+    case 'teacherScore': {
+      const from = change.from === null ? 'aucune' : formatScore(change.from, 0);
+      const to = change.to === null ? 'correction retirée' : formatScore(change.to, 0);
+      return `${change.label} : note corrigée ${from} → ${to}`;
+    }
+    case 'comment':
+      return `${change.label} : commentaire modifié`;
+    case 'strengths':
+      return `Points forts modifiés (${change.from.length} → ${change.to.length})`;
+    case 'improvements':
+      return `Pistes d’amélioration modifiées (${change.from.length} → ${change.to.length})`;
+    case 'overall':
+      return `Moyenne : ${formatScore(change.from)} → ${formatScore(change.to)}`;
+    default:
+      return 'Modification';
+  }
+}

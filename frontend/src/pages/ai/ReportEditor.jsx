@@ -10,6 +10,7 @@ import {
   statusLabel,
 } from './aiLabels.js';
 import { editReport, validateReport } from '../../services/aiService.js';
+import ReportHistory from './ReportHistory.jsx';
 
 const LIMITS = { summary: 800, comment: 500, point: 300 };
 
@@ -291,6 +292,8 @@ export default function ReportEditor({ report, onChange }) {
           </dl>
         </details>
       )}
+
+      <ReportHistory reportId={report.id} version={report.updatedAt} />
     </section>
   );
 }

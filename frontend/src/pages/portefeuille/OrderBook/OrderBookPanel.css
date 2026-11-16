@@ -435,3 +435,17 @@
     padding: 16px;
   }
 }
+
+/* ---- Refonte UI ---- */
+.ob-card {
+  position: relative;
+  border-color: var(--ar-line);
+  border-radius: var(--ar-radius-lg);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012)),
+    var(--ar-bg-1);
+  box-shadow: var(--ar-shadow-1);
+}
+.ob-eyebrow {
+  letter-spacing: 0.16em;
+}

@@ -2,6 +2,9 @@
 import { Link } from 'react-router-dom';
 import ModuleShell from '../../components/ModuleShell/ModuleShell.jsx';
 import CoachWidget from '../../components/CoachWidget/CoachWidget.jsx';
+import MarketAnalystPanel from '../../components/MarketAnalyst/MarketAnalystPanel.jsx';
+import LiveClassPanel from '../../components/LiveClass/LiveClassPanel.jsx';
+import ShockProjectionPanel from '../../components/ShockProjection/ShockProjectionPanel.jsx';
 import { useAuth } from '../../context/useAuth.js';
 import GrHeader from './GrHeader.jsx';
 import GrPortfolio from './GrPortfolio.jsx';
@@ -516,6 +519,12 @@ export default function GameRoomPage() {
                 {/* Son Portefeuille Virtuel Indépendant */}
                 <GrPortfolio portfolio={portfolioData?.portfolio} currency={currency} />
 
+                {/* Analyste de marché IA : lecture des prix et des événements de la salle */}
+                <MarketAnalystPanel roomId={roomData?.room?.id} />
+
+                {/* Projection IA après un choc : apparaît toute seule quand un choc survient */}
+                <ShockProjectionPanel roomId={roomData?.room?.id} />
+
                 {/* Scène de Marché : Graphique + Carnet + Trading */}
                 <div className="gr-main-grid">
                   <div className="gr-main-grid__chart-col">
@@ -599,6 +608,10 @@ export default function GameRoomPage() {
                   selectedStudentId={activeStudent?.userId}
                   onSelectStudent={(id) => setSelectedStudentId(id)}
                 />
+
+                <LiveClassPanel roomId={roomData?.room?.id} />
+                <MarketAnalystPanel roomId={roomData?.room?.id} />
+                <ShockProjectionPanel roomId={roomData?.room?.id} />
 
                 {/* Graphique et Carnet pour surveiller les mouvements de marché de la classe */}
                 <div className="gr-main-grid gr-main-grid--master">
@@ -724,10 +737,9 @@ export default function GameRoomPage() {
           </div>
         )}
 
-        {/* Coach IA : Uniquement visible pour les étudiants (traders), pas pour le Meneur de Jeu.
-            On ne passe pas sessionId : le backend résout automatiquement la séance IA visible
-            pour ce trader (via listVisibleSessions), indépendamment de l'ID de la Game Room. */}
-        {!isMaster && <CoachWidget />}
+        {/* Coach IA : uniquement pour les étudiants (traders), pas pour le Meneur de Jeu.
+            On lui donne la salle active : il répond sur les ordres de cet étudiant dans cette salle. */}
+        {!isMaster && <CoachWidget sessionId={roomData?.room?.id} />}
       </div>
     </ModuleShell>
   );

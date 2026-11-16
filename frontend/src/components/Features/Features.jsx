@@ -1,22 +1,16 @@
 import { Link } from 'react-router-dom';
 import { MODULES } from '../../data/modules.js';
 import { useAuth } from '../../context/useAuth.js';
+import { ModuleArt } from '../Art/Art.jsx';
 import './Features.css';
 
 function ModuleCard({ module }) {
-  const { number, title, role, question, description, tags, accent, image, imageAlt, path } = module;
+  const { id, number, title, role, question, description, tags, accent, path } = module;
 
   return (
     <article className="ar-module-card" style={{ '--card-accent': accent }}>
       <div className="ar-module-card__media">
-        <img
-          src={image}
-          alt={imageAlt}
-          width="800"
-          height="500"
-          loading="lazy"
-          className="ar-module-card__img"
-        />
+        <ModuleArt id={id} color={accent} className="ar-module-card__img" />
         <span className="ar-module-card__number">{number}</span>
       </div>
 
@@ -60,16 +54,16 @@ export default function Features() {
         <header className="ar-features__head">
           <span className="ar-features__pill">
             <span className="ar-features__pill-dot" />
-            Module fonctionnel · Portefeuille
+            Modules fonctionnels · Finance &amp; assurance
           </span>
           <h2 className="ar-features__title">
-            Une salle de marché,
+            Des outils pour comprendre,
             <br />
-            <span className="ar-features__title--accent">un portefeuille complet.</span>
+            <span className="ar-features__title--accent">simuler et décider.</span>
           </h2>
           <p className="ar-features__lead">
-            Carnet d&apos;ordres simulé, exécution au prix du marché et suivi du portefeuille :
-            de l&apos;ordre de bourse au P&amp;L, dans des conditions réelles.
+            Du trading aux scénarios pédagogiques et à la tarification d’assurance, explorez des
+            simulations pour analyser les marchés et mieux comprendre les risques.
           </p>
         </header>
 

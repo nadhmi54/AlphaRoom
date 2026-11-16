@@ -1,0 +1,150 @@
+/* Primitives d'interface réutilisables (préfixe ui-). */
+
+/* ---- cartes ---- */
+.ui-card {
+  position: relative;
+  padding: 22px;
+  border-radius: var(--ar-radius-lg);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+  border: 1px solid var(--ar-line);
+  box-shadow: var(--ar-shadow-1);
+}
+
+.ui-card--glow {
+  border-color: var(--ar-accent-line);
+  box-shadow: var(--ar-glow-gold);
+}
+
+.ui-eyebrow {
+  margin: 0;
+  font-family: var(--ar-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ar-accent);
+}
+
+/* ---- boutons ---- */
+.ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--ar-line-strong);
+  background: var(--ar-surface);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ar-text);
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    border-color var(--ar-fast) ease,
+    background var(--ar-fast) ease,
+    transform var(--ar-fast) ease,
+    box-shadow var(--ar-fast) ease;
+}
+
+.ui-btn:hover:not(:disabled) {
+  border-color: var(--ar-accent);
+  background: var(--ar-surface-hover);
+}
+
+.ui-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.ui-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ui-btn--primary {
+  border-color: transparent;
+  background: linear-gradient(135deg, #f0d9a2 0%, #d9b877 55%, #b8944f 100%);
+  color: var(--ar-accent-ink);
+  font-weight: 700;
+  box-shadow: 0 8px 24px rgba(217, 184, 119, 0.25);
+}
+
+.ui-btn--primary:hover:not(:disabled) {
+  border-color: transparent;
+  background: linear-gradient(135deg, #f6e3b0 0%, #e3c283 55%, #c4a05a 100%);
+  box-shadow: 0 10px 30px rgba(217, 184, 119, 0.38);
+}
+
+/* ---- pastilles ---- */
+.ui-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ar-text-dim);
+  background: var(--ar-surface);
+  border: 1px solid var(--ar-line);
+}
+
+.ui-chip--up {
+  color: var(--ar-up);
+  background: var(--ar-up-soft);
+  border-color: rgba(63, 209, 160, 0.35);
+}
+
+.ui-chip--down {
+  color: var(--ar-down);
+  background: var(--ar-down-soft);
+  border-color: rgba(255, 107, 122, 0.35);
+}
+
+.ui-chip--gold {
+  color: var(--ar-accent);
+  background: var(--ar-accent-soft);
+  border-color: var(--ar-accent-line);
+}
+
+/* ---- état vide ---- */
+.ui-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 36px 20px;
+  text-align: center;
+  color: var(--ar-text-dim);
+  font-size: 14px;
+  border: 1px dashed var(--ar-line-strong);
+  border-radius: var(--ar-radius);
+  background: radial-gradient(60% 80% at 50% 0%, rgba(217, 184, 119, 0.06), transparent 70%);
+}
+
+/* ---- squelette de chargement ---- */
+.ui-skeleton {
+  border-radius: var(--ar-radius-sm);
+  background: linear-gradient(
+    100deg,
+    rgba(255, 255, 255, 0.04) 20%,
+    rgba(255, 255, 255, 0.1) 40%,
+    rgba(255, 255, 255, 0.04) 60%
+  );
+  background-size: 200% 100%;
+  animation: ui-shimmer 1.4s linear infinite;
+}
+
+@keyframes ui-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-skeleton {
+    animation: none;
+  }
+}
