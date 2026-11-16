@@ -83,6 +83,7 @@ function setup(data: {
     create: vi.fn((x: Partial<AcademyQuizAttempt>) => Object.assign(new AcademyQuizAttempt(), x)),
     save: vi.fn(async (x: AcademyQuizAttempt) => x),
   };
+  const missions = { findOne: vi.fn().mockResolvedValue(null) };
   const access = {
     getCurrentLevel: vi.fn().mockResolvedValue(data.currentLevel ?? 1),
     getAccess: vi.fn().mockResolvedValue(data.access ?? playerAccess()),
@@ -107,16 +108,23 @@ function setup(data: {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     attempts as any,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    missions as any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     access as any,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     rules as any,
   );
-  return { service, quizzes, questions, courses, lessons, unlocks, progress, attempts, access, rules };
+  return { service, quizzes, questions, courses, lessons, unlocks, progress, attempts, missions, access, rules };
 }
 
 describe('AcademyQuizService.getQuiz', () => {
   it('sert les questions sans exposer la bonne réponse ni l’explication', async () => {
-    const { service } = setup({ quiz: quiz(), questions: [question()], course: course() });
+    const { service } = setup({
+      quiz: quiz(),
+      questions: [question()],
+      course: course(),
+      currentLevel: 1,
+    });
     const dto = await service.getQuiz('q1', 'u1');
     expect(dto.passThreshold).toBe(70);
     expect(dto.questions).toHaveLength(1);
@@ -125,20 +133,31 @@ describe('AcademyQuizService.getQuiz', () => {
   });
 
   it('refuse un quiz rattaché à un cours verrouillé', async () => {
-    const { service } = setup({ quiz: quiz(), course: course({ isPremium: true }) });
+    const { service, access } = setup({
+      quiz: quiz(),
+      course: course({ isPremium: true }),
+      currentLevel: 1,
+    });
     await expect(service.getQuiz('q1', 'u1')).rejects.toBeInstanceOf(ForbiddenException);
+    expect(access.getCurrentLevel).toHaveBeenCalledWith('u1');
   });
 
   it('refuse un quiz d’un cours de niveau non encore ouvert', async () => {
-    const { service } = setup({ quiz: quiz(), course: course({ level: 2 }), currentLevel: 1 });
+    const { service, access } = setup({
+      quiz: quiz(),
+      course: course({ level: 2, isPremium: false }),
+      currentLevel: 1,
+    });
     await expect(service.getQuiz('q1', 'u1')).rejects.toBeInstanceOf(ForbiddenException);
+    expect(access.getCurrentLevel).toHaveBeenCalledWith('u1');
   });
 
   it('autorise un cours avancé débloqué', async () => {
     const { service } = setup({
       quiz: quiz(),
-      course: course({ isPremium: true }),
+      course: course({ isPremium: true, level: 1 }),
       unlocks: [{ courseId: 'c1' }],
+      currentLevel: 1,
     });
     await expect(service.getQuiz('q1', 'u1')).resolves.toBeDefined();
   });
@@ -155,6 +174,7 @@ describe('AcademyQuizService.submitQuiz', () => {
       quiz: quiz(),
       course: course(),
       questions: [question({ id: 'q1', correctIndex: 1 }), question({ id: 'q2', correctIndex: 0 })],
+      currentLevel: 1,
     });
 
     const result = await service.submitQuiz('q1', 'u1', {
@@ -186,6 +206,7 @@ describe('AcademyQuizService.submitQuiz', () => {
       quiz: quiz(),
       course: course(),
       questions: [question({ id: 'q1', correctIndex: 1 })],
+      currentLevel: 1,
     });
     const result = await service.submitQuiz('q1', 'u1', {
       answers: [{ questionId: 'q1', selectedIndex: 1 }],
@@ -206,6 +227,7 @@ describe('AcademyQuizService.submitQuiz', () => {
       quiz: quiz(),
       course: course(),
       questions: [question({ id: 'q1', correctIndex: 1 })],
+      currentLevel: 1,
       access: playerAccess({
         levels: [
           {
@@ -226,9 +248,14 @@ describe('AcademyQuizService.submitQuiz', () => {
   });
 
   it('refuse la soumission si le cours est verrouillé', async () => {
-    const { service } = setup({ quiz: quiz(), course: course({ isPremium: true }) });
+    const { service, access } = setup({
+      quiz: quiz(),
+      course: course({ isPremium: true }),
+      currentLevel: 1,
+    });
     await expect(
       service.submitQuiz('q1', 'u1', { answers: [] }),
     ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(access.getCurrentLevel).toHaveBeenCalledWith('u1');
   });
 });
