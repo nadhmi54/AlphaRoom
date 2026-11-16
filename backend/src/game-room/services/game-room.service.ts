@@ -130,6 +130,38 @@ export class GameRoomService {
     );
   }
 
+  /** Toutes les salles de simulation actives / créées (accessibles aux traders). */
+  async getAllPublicRooms() {
+    await this.getOrCreateDemoRoom().catch(() => null);
+    const rooms = await this.rooms.find({
+      order: { createdAt: 'DESC' },
+    });
+    return Promise.all(
+      rooms.map(async (room) => {
+        const counts = await this.participants.count({ where: { roomId: room.id } });
+        const market = await this.marketSource.getMarketState(room);
+        return {
+          id: room.id,
+          name: room.name,
+          description: room.description ?? null,
+          joinCode: room.joinCode,
+          status: room.status,
+          sourceMode: room.sourceMode,
+          assets: this.marketSource.roomSymbols(room),
+          durationMinutes: Number(room.durationMinutes),
+          playbackSpeed: Number(room.playbackSpeed),
+          totalSimSeconds: Number(room.totalSimSeconds),
+          initialCapital: Number(room.initialCapital),
+          currency: room.currency,
+          participantsCount: counts,
+          maxParticipants: Number(room.maxParticipants),
+          currentPrice: market.price,
+          createdAt: room.createdAt,
+        };
+      }),
+    );
+  }
+
   /**
    * Création d'une Game Room par un enseignant : applique et persiste toute la
    * configuration (salle, source de marché, temps, risque) avant le lancement.
@@ -219,6 +251,13 @@ export class GameRoomService {
       `Salle ${saved.joinCode} créée par ${masterId} : source=${saved.sourceMode}, ` +
         `${saved.totalSimSeconds}s de simulation en ${saved.durationMinutes} min (x${saved.playbackSpeed}).`,
     );
+
+    // Salle personnelle d'un trader : le créateur y participe aussi, ce qui lui
+    // ouvre les routes IA (coach, analyste, projection) sans changer son rôle.
+    if (profile.role !== UserRole.GAME_MASTER && profile.role !== UserRole.ADMIN) {
+      await this.joinRoom(saved.id, masterId, profile.fullName || 'Étudiant');
+    }
+
     return saved;
   }
 
@@ -448,7 +487,10 @@ export class GameRoomService {
       take: 10,
     });
 
-    const isMaster = userRole === UserRole.GAME_MASTER || userRole === UserRole.ADMIN;
+    const isMaster =
+      userRole === UserRole.GAME_MASTER ||
+      userRole === UserRole.ADMIN ||
+      room.masterId === userId;
     const timeView = this.timeView(room, marketState);
 
     return {
@@ -661,12 +703,15 @@ export class GameRoomService {
    * Vue Enseignant / Game Master : tableau de bord de tous les étudiants de la salle.
    */
   async getMasterDashboard(roomId: string, userId: string, userRole = 'trader') {
-    if (userRole !== UserRole.GAME_MASTER && userRole !== UserRole.ADMIN) {
-      throw new ForbiddenException('Accès au tableau de bord réservé au Meneur de Jeu');
-    }
-
     const room = await this.rooms.findOne({ where: { id: roomId } });
     if (!room) throw new NotFoundException('Salle introuvable.');
+    if (
+      room.masterId !== userId &&
+      userRole !== UserRole.GAME_MASTER &&
+      userRole !== UserRole.ADMIN
+    ) {
+      throw new ForbiddenException('Accès au tableau de bord réservé au meneur de jeu de la salle');
+    }
 
     const studentParticipants = await this.studentParticipantsOf(room);
     const marketStates = await this.marketSource.getMarketStates(room);

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Param,
   Patch,
@@ -9,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { Auth } from '../users/auth.decorator.js';
 import { CurrentProfile } from '../users/current-profile.decorator.js';
-import { MASTER_ROLES } from '../users/user-role.enum.js';
+import { MASTER_ROLES, UserRole } from '../users/user-role.enum.js';
 import type { Profile } from '../users/profile.entity.js';
 import { GameRoomService } from './services/game-room.service.js';
 import { SimulationEngineService } from './services/simulation-engine.service.js';
@@ -57,16 +58,23 @@ export class GameRoomController {
     return { rooms: await this.roomService.getMasterRooms(profile.id) };
   }
 
+  /** Toutes les salles de simulation existantes pour le lobby des traders. */
+  @Get('all')
+  @Auth()
+  async getAllRooms() {
+    return { rooms: await this.roomService.getAllPublicRooms() };
+  }
+
   /** Validation et aperçu d'un fichier CSV de bougies, avant création de la salle. */
   @Post('preview-csv')
-  @Auth(...MASTER_ROLES)
+  @Auth()
   previewCsv(@Body() body: CsvPreviewDto) {
     return this.roomService.previewCsv(body.content);
   }
 
-  /** Créer une salle de simulation configurée (Enseignant / Game Master). */
+  /** Créer une salle de simulation configurée (Meneur de Jeu ou trader pour sa salle personnelle). */
   @Post('create')
-  @Auth(...MASTER_ROLES)
+  @Auth()
   async createRoom(@CurrentProfile() profile: Profile, @Body() body: CreateGameRoomDto) {
     const room = await this.roomService.createRoom(profile.id, body);
     return this.roomService.publicRoomView(room);
@@ -151,7 +159,7 @@ export class GameRoomController {
 
   /** Modifier la configuration d'une salle non lancée (Game Master). */
   @Patch(':roomId/config')
-  @Auth(...MASTER_ROLES)
+  @Auth()
   async updateConfig(
     @CurrentProfile() profile: Profile,
     @Param('roomId') roomId: string,
@@ -163,7 +171,7 @@ export class GameRoomController {
 
   /** Contrôle de la séance : Play, Pause, Resume, Reset, Fin (Game Master). */
   @Post(':roomId/control')
-  @Auth(...MASTER_ROLES)
+  @Auth()
   async controlRoom(
     @CurrentProfile() profile: Profile,
     @Param('roomId') roomId: string,
@@ -174,7 +182,7 @@ export class GameRoomController {
 
   /** Vitesse de relecture de la séance (Game Master). */
   @Post(':roomId/speed')
-  @Auth(...MASTER_ROLES)
+  @Auth()
   async setSpeed(
     @CurrentProfile() profile: Profile,
     @Param('roomId') roomId: string,
@@ -185,7 +193,7 @@ export class GameRoomController {
 
   /** Curseur de séance : saut à une seconde de simulation (Game Master). */
   @Post(':roomId/seek')
-  @Auth(...MASTER_ROLES)
+  @Auth()
   async seek(
     @CurrentProfile() profile: Profile,
     @Param('roomId') roomId: string,
@@ -196,7 +204,7 @@ export class GameRoomController {
 
   /** Actions Enseignant / Game Master : chocs de prix, news, spread, liquidité, rollback. */
   @Post(':roomId/action')
-  @Auth(...MASTER_ROLES)
+  @Auth()
   async gameMasterAction(
     @CurrentProfile() profile: Profile,
     @Param('roomId') roomId: string,
@@ -204,6 +212,9 @@ export class GameRoomController {
   ) {
     const room = await this.roomService.rooms.findOne({ where: { id: roomId } });
     if (!room) throw new Error('Salle introuvable');
+    if (room.masterId !== profile.id && !MASTER_ROLES.includes(profile.role as UserRole)) {
+      throw new ForbiddenException('Réservé au meneur de jeu de cette salle.');
+    }
     // Le rollback supprime les exécutions postérieures : on garde le passage actuel pour le module IA (replay).
     if (body.type === 'ROLLBACK') await this.runSnapshots.archiveCurrentRun(room);
     return this.simEngine.applyGameMasterAction(room, body);
@@ -211,7 +222,7 @@ export class GameRoomController {
 
   /** Tableau de bord de l'enseignant avec classement de tous les participants. */
   @Get(':roomId/dashboard')
-  @Auth(...MASTER_ROLES)
+  @Auth()
   async getDashboard(@CurrentProfile() profile: Profile, @Param('roomId') roomId: string) {
     return this.roomService.getMasterDashboard(roomId, profile.id, profile.role);
   }
@@ -226,8 +237,12 @@ export class GameRoomController {
   /** IA Projection après choc : éventail de trajectoires et scénarios (pas une prévision). */
   @Get(':roomId/ai/shock')
   @Auth()
-  async getAiShockProjection(@CurrentProfile() profile: Profile, @Param('roomId') roomId: string) {
-    return this.aiService.getShockProjection(roomId, profile);
+  async getAiShockProjection(
+    @CurrentProfile() profile: Profile,
+    @Param('roomId') roomId: string,
+    @Query('shockId') shockId?: string,
+  ) {
+    return this.aiService.getShockProjection(roomId, profile, shockId);
   }
 
   /** IA Trading Coach : Question-réponse pédagogique individualisée. */

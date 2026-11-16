@@ -189,12 +189,12 @@ describe('POST /api/game-room/create', () => {
     expect(body.source.seed).toBe(20261101);
   });
 
-  it('interdit la création à un étudiant', async () => {
+  it('permet à un étudiant de créer une salle personnelle dont il est le meneur', async () => {
     currentProfile = STUDENT;
     const { status } = await send('POST', '/api/game-room/create', payload);
 
-    expect(status).toBe(403);
-    expect(lastCall('createRoom')).toBeUndefined();
+    expect(status).toBe(201);
+    expect(lastCall('createRoom')!.args[0]).toBe('student-1');
   });
 });
 
@@ -235,12 +235,18 @@ describe('Contrôles de séance du Meneur de Jeu', () => {
     expect((await send('POST', '/api/game-room/room-1/control', { action: 'rewind' })).status).toBe(400);
   });
 
-  it('interdit le pilotage de la séance à un étudiant', async () => {
+  it('interdit le pilotage d\'une salle d\'autrui à un étudiant', async () => {
     currentProfile = STUDENT;
-    expect((await send('POST', '/api/game-room/room-1/speed', { speed: 2 })).status).toBe(403);
-    expect((await send('POST', '/api/game-room/room-1/control', { action: 'start' })).status).toBe(403);
+    // Vitesse/contrôle/dashboard : la propriété de la salle est vérifiée par le
+    // service (controlRoom, requireMasterRoom, getMasterRoomDashboard), plus par le garde de rôle.
+    expect((await send('POST', '/api/game-room/room-1/speed', { speed: 2 })).status).toBe(201);
+    expect(lastCall('setSpeed')!.args).toEqual(['room-1', 'student-1', 2]);
+    // Liste « mes salles » : réservée aux comptes Meneur de Jeu / Admin.
     expect((await send('GET', '/api/game-room/mine')).status).toBe(403);
-    expect((await send('GET', '/api/game-room/room-1/dashboard')).status).toBe(403);
+    // Actions Game Master : le contrôleur bloque l'étudiant qui ne possède pas la salle.
+    expect(
+      (await send('POST', '/api/game-room/room-1/action', { type: 'NEWS', title: 'intrus' })).status,
+    ).toBe(403);
   });
 });
 

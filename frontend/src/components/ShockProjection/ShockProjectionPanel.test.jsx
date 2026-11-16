@@ -104,4 +104,25 @@ describe('ShockProjectionPanel', () => {
     await renderPanel();
     expect(screen.getByRole('alert')).toHaveTextContent('Salle introuvable.');
   });
+
+  it('affiche tous les chocs survenus et permet de basculer de l’un à l’autre', async () => {
+    const shocks = [
+      { id: 'ev-1', minute: 2.8, type: 'price_shock', label: 'Choc de prix (-3%)' },
+      { id: 'ev-2', minute: 8.5, type: 'spread_shock', label: 'Choc de spread (x4)' },
+    ];
+    vi.mocked(getAiShockProjection).mockResolvedValue({
+      projection: projection({ choc: { id: 'ev-2', minute: 8.5, type: 'spread_shock', titre: 'Choc de spread (x4)', variation_pct: 0, recent: true } }),
+      shocks,
+      text: 'x',
+    });
+    await renderPanel();
+    expect(screen.getByText(/Choc 2 \/ 2/i)).toBeInTheDocument();
+    expect(screen.getByText(/Choc de prix \(-3%\)/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Choc de spread \(x4\)/i).length).toBeGreaterThan(0);
+    expect(screen.getByText('Dernier')).toBeInTheDocument();
+
+    // Cliquer sur le premier choc
+    fireEvent.click(screen.getByText(/Choc de prix \(-3%\)/i));
+    expect(getAiShockProjection).toHaveBeenCalledWith('room-1', 'ev-1');
+  });
 });

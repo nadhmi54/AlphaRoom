@@ -114,16 +114,31 @@ export class MarketSourceService {
     return clamp((room.simElapsedSeconds ?? 0) + realSeconds * speed, total);
   }
 
-  getShocks(roomId: string): RoomShocks {
-    return this.shocks.get(roomId) ?? { ...NEUTRAL_SHOCKS };
+  private shockKey(roomId: string, symbol?: string): string {
+    return symbol ? `${roomId}:${symbol.trim().toUpperCase()}` : roomId;
   }
 
-  setShocks(roomId: string, shocks: RoomShocks): void {
-    this.shocks.set(roomId, shocks);
+  getShocks(roomId: string, symbol?: string): RoomShocks {
+    if (symbol) {
+      const perAsset = this.shocks.get(this.shockKey(roomId, symbol));
+      if (perAsset) return { ...perAsset };
+    }
+    const globalShocks = this.shocks.get(roomId);
+    if (globalShocks) return { ...globalShocks };
+    return { ...NEUTRAL_SHOCKS };
+  }
+
+  setShocks(roomId: string, shocks: RoomShocks, symbol?: string): void {
+    const key = this.shockKey(roomId, symbol);
+    this.shocks.set(key, { ...shocks });
   }
 
   resetRoomShocks(roomId: string): void {
-    this.shocks.delete(roomId);
+    for (const key of Array.from(this.shocks.keys())) {
+      if (key === roomId || key.startsWith(`${roomId}:`)) {
+        this.shocks.delete(key);
+      }
+    }
     this.datasets.delete(datasetKey(roomId, '*'));
   }
 
@@ -151,7 +166,7 @@ export class MarketSourceService {
   async getMarketState(room: GameRoom, symbol?: string): Promise<MarketState> {
     const active = symbol ?? this.primarySymbol(room);
     const elapsed = this.calculateCurrentElapsedSeconds(room);
-    const shocks = this.getShocks(room.id);
+    const shocks = this.getShocks(room.id, active);
     const config = room.sourceConfig ?? {};
 
     const base = await this.resolveBasePrice(room, active, elapsed, config);
@@ -244,6 +259,9 @@ export class MarketSourceService {
   private syntheticConfig(symbol: string, config: MarketSourceConfig): MarketSourceConfig {
     return {
       ...config,
+      // Graine dérivée du symbole : sans cela, tous les actifs de la salle
+      // dessinaient la même courbe de bruit, simplement mise à l'échelle.
+      seed: symbolSeed(config.seed ?? 1, symbol),
       initialPrice:
         config.initialPrice && config.initialPrice > 0
           ? config.initialPrice
@@ -399,7 +417,7 @@ export class MarketSourceService {
   /** Courbe du prix depuis la seconde 0 jusqu'à l'instant courant. */
   async buildSeries(room: GameRoom, symbol: string, elapsed: number): Promise<SeriesPoint[]> {
     const sample = await this.sampler(room, symbol);
-    const shocks = this.getShocks(room.id);
+    const shocks = this.getShocks(room.id, symbol);
     const points = Math.min(SERIES_MAX_POINTS, Math.max(2, Math.ceil(elapsed / 15) + 1));
     const step = elapsed > 0 ? elapsed / (points - 1) : 1;
     const series: SeriesPoint[] = [];
@@ -425,7 +443,7 @@ export class MarketSourceService {
     timeframe?: string,
   ): Promise<CandlePoint[]> {
     const sample = await this.sampler(room, symbol);
-    const shocks = this.getShocks(room.id);
+    const shocks = this.getShocks(room.id, symbol);
     const at = (t: number) =>
       roundAssetPrice(symbol, Math.max(0.000001, sample(t) + shocks.priceOffset));
     const bucket = TIMEFRAME_SECONDS[(timeframe ?? room.timeframe) as GameRoomTimeframe] ?? 60;
@@ -538,6 +556,16 @@ function datasetKey(roomId: string, symbol: string): string {
 
 function spreadFromPrice(symbol: string, price: number): number {
   return Math.max(0.000001, (price * naturalSpreadPercent(symbol)) / 100);
+}
+
+/** Dérive déterministe de la graine de séance à partir du symbole. */
+function symbolSeed(base: number, symbol: string): number {
+  let h = Math.trunc(base) || 1;
+  const key = symbol.trim().toUpperCase();
+  for (let i = 0; i < key.length; i++) {
+    h = (h * 131 + key.charCodeAt(i)) % 2147483647;
+  }
+  return h;
 }
 
 /** Interpolation linéaire d'une série indexée en secondes de simulation. */

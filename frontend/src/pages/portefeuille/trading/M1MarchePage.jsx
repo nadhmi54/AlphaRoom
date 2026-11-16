@@ -50,7 +50,8 @@ function readStoredTab() {
 export default function M1MarchePage() {
   const [assets, setAssets] = useState([]);
   const [account, setAccount] = useState(null);
-  const [selectedSymbol, setSelectedSymbol] = useState("XAU/USD");
+  // Aucun actif imposé au chargement : le trader choisit lui-même sa paire.
+  const [selectedSymbol, setSelectedSymbol] = useState(null);
   const [range, setRange] = useState("5m");
   const [tab, setTabState] = useState(readStoredTab);
   const [focus, setFocus] = useState(false);

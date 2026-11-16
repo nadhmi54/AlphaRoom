@@ -79,6 +79,12 @@ export default function useLiveMarket(symbol, range, assets = []) {
   // ── Historique ────────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
+    if (!symbol) {
+      // Aucun actif choisi : rien à charger, la courbe reste vide.
+      setSeries([]);
+      setLoadingSeries(false);
+      return undefined;
+    }
     setLoadingSeries(true);
     setSeries([]);
     getHistory(symbol, range)

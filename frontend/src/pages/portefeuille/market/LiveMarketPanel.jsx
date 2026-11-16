@@ -318,7 +318,11 @@ export default function LiveMarketPanel({
             </div>
           </div>
 
-          {loadingSeries && series.length === 0 ? (
+          {symbol === null || symbol === undefined ? (
+            <div className="lm-chart lm-chart--empty">
+              Choisis un actif dans la barre de recherche ci-dessus ou dans le bandeau de prix pour afficher sa courbe.
+            </div>
+          ) : loadingSeries && series.length === 0 ? (
             <div className="lm-chart lm-chart--empty">Chargement de la courbe…</div>
           ) : series.length < 2 && !loadingSeries ? (
             <div className="lm-chart lm-chart--empty">Données insuffisantes pour afficher la courbe.</div>

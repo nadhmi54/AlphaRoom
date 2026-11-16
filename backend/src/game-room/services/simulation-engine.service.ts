@@ -9,6 +9,9 @@ import { SimulationOrder, SimOrderSide, SimOrderType } from '../entities/sim-ord
 import { SimulationTrade } from '../entities/sim-trade.entity.js';
 import { GameEvent, GameEventType } from '../entities/game-event.entity.js';
 import { GameSnapshot } from '../entities/game-snapshot.entity.js';
+import { GameParticipant } from '../entities/game-participant.entity.js';
+import { Profile } from '../../users/profile.entity.js';
+import { UserRole } from '../../users/user-role.enum.js';
 import {
   MarketSourceService,
   playbackSpeed,
@@ -82,6 +85,8 @@ export class SimulationEngineService {
   /**
    * Carnet d'ordres simulé : liquidité système autour du prix de la source,
    * plus les ordres limites en attente des participants sur cet actif.
+   * Exception : dans une salle du Meneur de Jeu avec 2 participants ou plus,
+   * le carnet est constitué uniquement des ordres réels des joueurs.
    */
   async getOrderBook(room: GameRoom, symbol?: string): Promise<SimOrderBookView> {
     const state = await this.marketSource.getMarketState(room, symbol);
@@ -89,6 +94,14 @@ export class SimulationEngineService {
     const halfSpread = state.spread / 2;
     const bestBid = Number((state.price - halfSpread).toFixed(decimals));
     const bestAsk = Number((state.price + halfSpread).toFixed(decimals));
+
+    const pendingOrders = await this.orders.find({
+      where: { roomId: room.id, status: 'open', symbol: state.symbol },
+    });
+
+    if (await this.isBookPlayerDriven(room)) {
+      return this.playerOrderBook(state, pendingOrders, decimals, bestBid, bestAsk);
+    }
 
     const depthConfig = BOOK_DEPTH[state.symbol] ?? { baseQty: 15, step: state.price * 0.0001 };
     const baseQty = depthConfig.baseQty * state.shocks.liquidityFactor;
@@ -112,10 +125,6 @@ export class SimulationEngineService {
         orders: 3 + i * 2,
       });
     }
-
-    const pendingOrders = await this.orders.find({
-      where: { roomId: room.id, status: 'open', symbol: state.symbol },
-    });
 
     for (const ord of pendingOrders) {
       if (!ord.limitPrice) continue;
@@ -142,6 +151,68 @@ export class SimulationEngineService {
       bestBid: bids[0]?.price ?? bestBid,
       bestAsk: asks[0]?.price ?? bestAsk,
       spread: Number(((asks[0]?.price ?? bestAsk) - (bids[0]?.price ?? bestBid)).toFixed(decimals)),
+      bids: bids.slice(0, 8),
+      asks: asks.slice(0, 8),
+      simMinute: state.currentMinute,
+    };
+  }
+
+  /**
+   * Le carnet devient 100 % joueur seulement dans une salle créée par un compte
+   * Meneur de Jeu/Admin ayant au moins 2 participants. Salle personnelle d'un
+   * trader ou séance mono-joueur : liquidité système conservée.
+   */
+  private async isBookPlayerDriven(room: GameRoom): Promise<boolean> {
+    const owner = await this.dataSource
+      .getRepository(Profile)
+      .findOne({ where: { id: room.masterId }, select: { role: true } });
+    if (!owner || (owner.role !== UserRole.GAME_MASTER && owner.role !== UserRole.ADMIN)) {
+      return false;
+    }
+    const participants = await this.dataSource
+      .getRepository(GameParticipant)
+      .count({ where: { roomId: room.id } });
+    return participants >= 2;
+  }
+
+  /** Carnet dressé à partir des seuls ordres limites en attente des joueurs. */
+  private playerOrderBook(
+    state: MarketState,
+    pendingOrders: SimulationOrder[],
+    decimals: number,
+    fallbackBid: number,
+    fallbackAsk: number,
+  ): SimOrderBookView {
+    const bids: SimBookLevel[] = [];
+    const asks: SimBookLevel[] = [];
+    for (const ord of pendingOrders) {
+      if (!ord.limitPrice) continue;
+      const sideLevels = ord.side === 'buy' ? bids : asks;
+      const found = sideLevels.find(
+        (level) => Math.abs(level.price - Number(ord.limitPrice)) < LEVEL_MATCH_TOLERANCE,
+      );
+      if (found) {
+        found.quantity = Math.round((found.quantity + Number(ord.remainingQuantity)) * 100) / 100;
+        found.orders += 1;
+      } else {
+        sideLevels.push({
+          price: Number(ord.limitPrice),
+          quantity: Number(ord.remainingQuantity),
+          orders: 1,
+        });
+      }
+    }
+    bids.sort((a, b) => b.price - a.price);
+    asks.sort((a, b) => a.price - b.price);
+
+    const topBid = bids[0]?.price ?? fallbackBid;
+    const topAsk = asks[0]?.price ?? fallbackAsk;
+    return {
+      symbol: state.symbol,
+      lastPrice: state.price,
+      bestBid: Number(topBid.toFixed(decimals)),
+      bestAsk: Number(topAsk.toFixed(decimals)),
+      spread: Number((topAsk - topBid).toFixed(decimals)),
       bids: bids.slice(0, 8),
       asks: asks.slice(0, 8),
       simMinute: state.currentMinute,
@@ -503,13 +574,20 @@ export class SimulationEngineService {
     title: string;
     description?: string;
     payload?: Record<string, any>;
+    symbol?: string;
   }) {
     const elapsed = this.calculateCurrentElapsedSeconds(room);
-    const currentShocks = this.marketSource.getShocks(room.id);
     const payload: Record<string, any> = { ...action.payload };
+    const targetSymbol =
+      action.symbol ||
+      payload.symbol ||
+      this.marketSource.primarySymbol(room);
+    payload.symbol = targetSymbol;
+
+    const currentShocks = this.marketSource.getShocks(room.id, targetSymbol);
 
     if (action.type === 'PRICE_SHOCK' && payload.priceDelta === undefined) {
-      const baseState = await this.marketSource.getMarketState(room);
+      const baseState = await this.marketSource.getMarketState(room, targetSymbol);
       const percent = Number(payload.percent);
       payload.priceDelta = Number.isFinite(percent) && percent !== 0
         ? -Math.abs(baseState.price * (percent / 100))
@@ -552,7 +630,7 @@ export class SimulationEngineService {
         break;
     }
 
-    this.marketSource.setShocks(room.id, currentShocks);
+    this.marketSource.setShocks(room.id, currentShocks, targetSymbol);
     return { success: true, event };
   }
 
@@ -593,9 +671,11 @@ export class SimulationEngineService {
       where: { roomId: room.id },
       order: { simElapsedSeconds: 'ASC' },
     });
-    const shocks = { priceOffset: 0, spreadMultiplier: 1.0, liquidityFactor: 1.0 };
+    this.marketSource.resetRoomShocks(room.id);
     for (const ev of remainingEvents) {
       if (ev.simElapsedSeconds > targetSeconds) continue;
+      const targetSym = ev.payload?.symbol;
+      const shocks = this.marketSource.getShocks(room.id, targetSym);
       if (ev.type === 'PRICE_SHOCK') {
         const delta = Number(ev.payload?.priceDelta ?? -50);
         shocks.priceOffset += Number.isFinite(delta) ? delta : 0;
@@ -604,8 +684,8 @@ export class SimulationEngineService {
       } else if (ev.type === 'LIQUIDITY_SHOCK') {
         shocks.liquidityFactor = Number(ev.payload?.factor ?? 0.25);
       }
+      this.marketSource.setShocks(room.id, shocks, targetSym);
     }
-    this.marketSource.setShocks(room.id, shocks);
 
     return this.dataSource.transaction(async (manager) => {
       room.simElapsedSeconds = Math.min(targetSeconds, totalSimSeconds(room));

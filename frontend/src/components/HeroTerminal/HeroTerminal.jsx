@@ -59,7 +59,7 @@ export default function HeroTerminal() {
           <i />
           <i />
         </span>
-        <span className="ar-term__tab">XAU/USD · Or</span>
+        <span className="ar-term__tab">Marché</span>
         <span className="ar-term__badge">Aperçu illustratif</span>
       </div>
 

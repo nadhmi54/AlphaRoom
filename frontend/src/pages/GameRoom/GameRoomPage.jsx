@@ -17,6 +17,7 @@ import GrCreateRoomModal from './GrCreateRoomModal.jsx';
 import { assetDecimals, assetUnitShort } from '../../data/roomAssets.js';
 import {
   getDemoRoom,
+  getAllGameRooms,
   getMyRooms,
   getGameRoomDetails,
   getGameRoomPortfolio,
@@ -42,7 +43,8 @@ const SOURCE_LABELS = {
 };
 
 export default function GameRoomPage() {
-  const { profile } = useAuth();
+  const { profile, session } = useAuth();
+  const userId = profile?.id || session?.user?.id;
   const [roomData, setRoomData] = useState(null);
   const [portfolioData, setPortfolioData] = useState(null);
   const [dashboardData, setDashboardData] = useState(null);
@@ -67,37 +69,88 @@ export default function GameRoomPage() {
   const [joinNicknameInput, setJoinNicknameInput] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
 
+  // Lobby Trader : vrai tant que le trader n'a pas sélectionné de salle
+  const [showTraderLobby, setShowTraderLobby] = useState(false);
+  // Données des salles publiques chargées dans le lobby (au minimum la salle démo)
+  const [lobbyRooms, setLobbyRooms] = useState([]);
+
   const activeRoomIdRef = useRef(null);
   const previousEventsCountRef = useRef(0);
 
   const isMasterRole = profile?.role === 'game_master' || profile?.role === 'admin';
 
-  // Vérification stricte du rôle : Seuls 'game_master' ou 'admin' peuvent voir le panneau enseignant.
-  // Un utilisateur étudiant / trader ne verra JAMAIS le panneau enseignant ni le tableau des participants.
-  const isMaster = Boolean(isMasterRole && roomData?.room?.isMaster);
+  // Panneau enseignant visible pour les comptes Meneur de Jeu/Admin, et pour un
+  // trader dans la salle personnelle qu'il a lui-même créée (room.isMaster côté serveur).
+  const isMaster = Boolean(roomData?.room?.isMaster);
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 4500);
   };
 
+  // Sauvegarde de la salle active dans le localStorage et synchronisation de l'URL
+  const saveActiveRoomId = useCallback(
+    (roomId) => {
+      if (!roomId) return;
+      try {
+        if (userId) window.localStorage.setItem(`alpharoom:game-room:active-id:${userId}`, roomId);
+        window.localStorage.setItem('alpharoom:game-room:last-id', roomId);
+      } catch {
+        // Ignorer si localStorage restreint
+      }
+      try {
+        const url = new URL(window.location.href);
+        if (url.searchParams.get('roomId') !== roomId) {
+          url.searchParams.set('roomId', roomId);
+          window.history.replaceState(null, '', url.pathname + url.search);
+        }
+      } catch {
+        // Ignorer si environnement sans URL
+      }
+    },
+    [userId],
+  );
+
+  const clearActiveRoomId = useCallback(() => {
+    try {
+      if (userId) {
+        window.localStorage.removeItem(`alpharoom:game-room:active-id:${userId}`);
+      }
+      window.localStorage.removeItem('alpharoom:game-room:last-id');
+    } catch {
+      // Ignorer
+    }
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has('roomId')) {
+        url.searchParams.delete('roomId');
+        window.history.replaceState(null, '', url.pathname + (url.search || ''));
+      }
+    } catch {
+      // Ignorer
+    }
+  }, [userId]);
+
   // Chargement complet d'une salle donnée (marché, portefeuille, tableau de bord)
   const loadRoom = useCallback(
     async (roomId, symbol) => {
       const details = await getGameRoomDetails(roomId, symbol);
       activeRoomIdRef.current = roomId;
+      saveActiveRoomId(roomId);
       setActiveSymbol(details.room?.activeSymbol ?? null);
       setRoomData(details);
 
       const [pf, dash] = await Promise.all([
         getGameRoomPortfolio(roomId),
-        isMasterRole ? getGameRoomDashboard(roomId) : Promise.resolve(null),
+        details.room?.isMaster
+          ? getGameRoomDashboard(roomId).catch(() => null)
+          : Promise.resolve(null),
       ]);
       setPortfolioData(pf);
       setDashboardData(dash);
       return details;
     },
-    [isMasterRole],
+    [saveActiveRoomId],
   );
 
   const refreshMyRooms = useCallback(async () => {
@@ -108,14 +161,55 @@ export default function GameRoomPage() {
     return rooms;
   }, [isMasterRole]);
 
-  // Chargement initial : les salles du Meneur de Jeu, sinon la salle démo
+  // Chargement initial : salle persistée (URL ou localStorage), sinon salles du Meneur de Jeu, sinon salle démo
   const initRoom = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
 
+      // 1. Chercher si une salle était déjà sélectionnée (URL ou localStorage)
+      let savedRoomId = null;
+      try {
+        const params = new URLSearchParams(window.location.search);
+        savedRoomId = params.get('roomId') || params.get('room');
+      } catch {
+        // Ignorer
+      }
+      if (!savedRoomId) {
+        try {
+          const userKey = userId ? `alpharoom:game-room:active-id:${userId}` : null;
+          savedRoomId =
+            (userKey ? window.localStorage.getItem(userKey) : null) ||
+            window.localStorage.getItem('alpharoom:game-room:last-id');
+        } catch {
+          // Ignorer
+        }
+      }
+
       if (isMasterRole) {
-        const rooms = await refreshMyRooms().catch(() => []);
+        await refreshMyRooms().catch(() => []);
+      }
+
+      if (savedRoomId) {
+        try {
+          // Idempotent : garantit l'inscription étudiant même si la salle
+          // avait été ouverte sans passer par « Rejoindre ».
+          if (!isMasterRole) {
+            await joinGameRoom(savedRoomId, profile?.fullName || 'Étudiant').catch(() => null);
+          }
+          await loadRoom(savedRoomId);
+          return;
+        } catch {
+          // La salle sauvegardée n'existe plus ou est inaccessible
+          clearActiveRoomId();
+        }
+      }
+
+      // 2. Si meneur de jeu avec des salles, charger la première salle en cours ou créée
+      if (isMasterRole) {
+        const mine = await getMyRooms().catch(() => ({ rooms: [] }));
+        const rooms = mine.rooms || [];
+        setMyRooms(rooms);
         const preferred = rooms.find((room) => room.status === 'running') || rooms[0];
         if (preferred) {
           await loadRoom(preferred.id);
@@ -123,14 +217,36 @@ export default function GameRoomPage() {
         }
       }
 
+      // 3. Trader sans salle sauvegardée → afficher le lobby (toutes les salles de simulation disponibles)
+      if (!isMasterRole) {
+        let roomsList = [];
+        try {
+          const res = await getAllGameRooms();
+          roomsList = res?.rooms || [];
+        } catch {
+          // Ignorer si échec
+        }
+        if (roomsList.length === 0) {
+          const demo = await getDemoRoom().catch(() => null);
+          if (demo?.room) roomsList = [demo.room];
+        }
+        setLobbyRooms(roomsList);
+        setShowTraderLobby(true);
+        return;
+      }
+
+      // 4. Fallback Master sans salle → salle de démonstration par défaut
       const initial = await getDemoRoom();
       activeRoomIdRef.current = initial.room.id;
+      saveActiveRoomId(initial.room.id);
       setActiveSymbol(initial.room?.activeSymbol ?? initial.market?.symbol ?? null);
       setRoomData(initial);
 
       const [pf, dash] = await Promise.all([
         getGameRoomPortfolio(initial.room.id),
-        initial.room?.isMaster && isMasterRole ? getGameRoomDashboard(initial.room.id) : Promise.resolve(null),
+        initial.room?.isMaster
+          ? getGameRoomDashboard(initial.room.id).catch(() => null)
+          : Promise.resolve(null),
       ]);
       setPortfolioData(pf);
       if (dash) setDashboardData(dash);
@@ -139,18 +255,18 @@ export default function GameRoomPage() {
     } finally {
       setLoading(false);
     }
-  }, [isMasterRole, loadRoom, refreshMyRooms]);
+  }, [isMasterRole, loadRoom, refreshMyRooms, userId, saveActiveRoomId, clearActiveRoomId]);
 
   useEffect(() => {
     initRoom();
-  }, [initRoom]);
+  }, []);
 
   // Synchronisation continue du marché et détection des événements diffusés
   const syncRoom = useCallback(async () => {
     const roomId = activeRoomIdRef.current;
     if (!roomId) return;
     try {
-      const userIsMaster = Boolean(isMasterRole && roomData?.room?.isMaster);
+      const userIsMaster = Boolean(roomData?.room?.isMaster);
 
       const [updatedDetails, updatedPf] = await Promise.all([
         getGameRoomDetails(roomId, activeSymbol),
@@ -304,7 +420,15 @@ export default function GameRoomPage() {
   const handleTriggerAction = async (actionPayload) => {
     if (!roomData?.room?.id) return;
     try {
-      await triggerGameMasterAction(roomData.room.id, actionPayload);
+      const payloadWithSymbol = {
+        ...actionPayload,
+        symbol: actionPayload.symbol || actionPayload.payload?.symbol || symbol,
+        payload: {
+          symbol: actionPayload.payload?.symbol || symbol,
+          ...(actionPayload.payload || {}),
+        },
+      };
+      await triggerGameMasterAction(roomData.room.id, payloadWithSymbol);
       showToast(`Événement déclenché : ${actionPayload.title}`, 'info');
       await syncRoom();
     } catch (err) {
@@ -320,6 +444,97 @@ export default function GameRoomPage() {
       setLoading(true);
       const res = await joinGameRoom(joinCodeInput.trim(), joinNicknameInput.trim());
       setShowJoinModal(false);
+      setJoinCodeInput('');
+      setJoinNicknameInput('');
+      previousEventsCountRef.current = 0;
+      await loadRoom(res.room.id);
+      showToast(`Connecté à la salle : ${res.room.name}`, 'success');
+    } catch (err) {
+      showToast(err.message || 'Salle introuvable avec ce code', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Revenir au lobby des salles de simulation (Trader)
+  const handleOpenLobby = async () => {
+    try {
+      setLoading(true);
+      clearActiveRoomId();
+      let roomsList = [];
+      try {
+        const res = await getAllGameRooms();
+        roomsList = res?.rooms || [];
+      } catch {
+        // Fallback
+      }
+      if (roomsList.length === 0) {
+        const demo = await getDemoRoom().catch(() => null);
+        if (demo?.room) roomsList = [demo.room];
+      }
+      setLobbyRooms(roomsList);
+      setShowTraderLobby(true);
+      setShowJoinModal(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Revenir à la salle démo initiale
+  const handleResetToDemoRoom = async () => {
+    try {
+      setLoading(true);
+      clearActiveRoomId();
+      const initial = await getDemoRoom();
+      activeRoomIdRef.current = initial.room.id;
+      saveActiveRoomId(initial.room.id);
+      setActiveSymbol(initial.room?.activeSymbol ?? initial.market?.symbol ?? null);
+      setRoomData(initial);
+
+      const [pf, dash] = await Promise.all([
+        getGameRoomPortfolio(initial.room.id),
+        initial.room?.isMaster
+          ? getGameRoomDashboard(initial.room.id).catch(() => null)
+          : Promise.resolve(null),
+      ]);
+      setPortfolioData(pf);
+      if (dash) setDashboardData(dash);
+      setShowJoinModal(false);
+      showToast('Retour à la salle de démonstration : Le mardi de la panique', 'info');
+    } catch (err) {
+      showToast(err.message || 'Impossible de charger la salle de démo.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Entrer dans une salle depuis le lobby Trader
+  const handleEnterRoomFromLobby = async (roomId) => {
+    try {
+      setLoading(true);
+      // L'entrée par carte vaut inscription : sans participant enregistré,
+      // les routes IA (analyste, coach, projection) répondent « tu n'y participes pas ».
+      if (!isMasterRole) {
+        await joinGameRoom(roomId, joinNicknameInput.trim() || profile?.fullName || 'Étudiant');
+      }
+      setShowTraderLobby(false);
+      await loadRoom(roomId);
+    } catch (err) {
+      showToast(err.message || 'Impossible d\'ouvrir cette salle.', 'error');
+      setShowTraderLobby(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Rejoindre depuis le lobby (via code) puis fermer le lobby
+  const handleLobbyJoin = async (e) => {
+    e.preventDefault();
+    if (!joinCodeInput.trim()) return;
+    try {
+      setLoading(true);
+      const res = await joinGameRoom(joinCodeInput.trim(), joinNicknameInput.trim());
+      setShowTraderLobby(false);
       setJoinCodeInput('');
       setJoinNicknameInput('');
       previousEventsCountRef.current = 0;
@@ -386,8 +601,114 @@ export default function GameRoomPage() {
           </div>
         )}
 
+        {/* LOBBY TRADER : sélection de la salle avant d'entrer */}
+        {showTraderLobby && !isMasterRole && (
+          <div className="gr-trader-lobby">
+            <div className="gr-trader-lobby__header">
+              <span className="gr-eyebrow">SALLES DE SIMULATION DISPONIBLES</span>
+              <h2 className="gr-trader-lobby__title">Choisissez votre salle</h2>
+              <p className="gr-trader-lobby__subtitle">
+                Sélectionnez une salle ci-dessous ou collez le code fourni par votre formateur pour rejoindre sa séance.
+              </p>
+            </div>
+
+            {/* Cartes des salles disponibles */}
+            <div className="gr-trader-lobby__rooms">
+              {lobbyRooms.map((lobbyRoom) => (
+                <button
+                  key={lobbyRoom.id}
+                  type="button"
+                  className="gr-trader-lobby__room-card"
+                  onClick={() => handleEnterRoomFromLobby(lobbyRoom.id)}
+                >
+                  <div className="gr-trader-lobby__room-badge">
+                    <span className={`gr-status gr-status--${lobbyRoom.status || 'running'}`}>
+                      <i className="gr-status__dot" aria-hidden="true" />
+                      {lobbyRoom.status === 'waiting' ? 'En attente'
+                        : lobbyRoom.status === 'paused' ? 'En pause'
+                        : lobbyRoom.status === 'finished' ? 'Terminée'
+                        : 'En cours'}
+                    </span>
+                    <span className="gr-trader-lobby__room-tag">🎓 Démonstration</span>
+                  </div>
+                  <strong className="gr-trader-lobby__room-name">{lobbyRoom.name}</strong>
+                  {lobbyRoom.description && (
+                    <p className="gr-trader-lobby__room-desc">{lobbyRoom.description}</p>
+                  )}
+                  <div className="gr-trader-lobby__room-meta">
+                    {lobbyRoom.assets?.length > 0 && (
+                      <span>📊 {lobbyRoom.assets.join(', ')}</span>
+                    )}
+                    {lobbyRoom.durationMinutes && (
+                      <span>⏱ {lobbyRoom.durationMinutes} min</span>
+                    )}
+                    {lobbyRoom.initialCapital && (
+                      <span>
+                        💰 {Number(lobbyRoom.initialCapital).toLocaleString('fr-FR')}{' '}
+                        {lobbyRoom.currency === 'EUR' ? '€' : '$US'}
+                      </span>
+                    )}
+                  </div>
+                  {lobbyRoom.joinCode && (
+                    <div className="gr-trader-lobby__room-code">
+                      Code : <strong>{lobbyRoom.joinCode}</strong>
+                      <button
+                        type="button"
+                        className="gr-trader-lobby__copy-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigator.clipboard?.writeText(lobbyRoom.joinCode);
+                          setJoinCodeInput(lobbyRoom.joinCode);
+                          showToast(`Code ${lobbyRoom.joinCode} copié et collé dans « Rejoindre la salle » !`);
+                        }}
+                        title="Copier et coller le code"
+                      >
+                        📋 Copier
+                      </button>
+                    </div>
+                  )}
+                  <span className="gr-trader-lobby__room-enter">Entrer dans la salle →</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Zone rejoindre avec un code */}
+            <div className="gr-trader-lobby__join-panel">
+              <div className="gr-trader-lobby__join-header">
+                <span className="gr-eyebrow">REJOINDRE UNE SALLE</span>
+                <p>Collez le code partagé par votre formateur pour rejoindre sa séance.</p>
+              </div>
+              <form className="gr-trader-lobby__join-form" onSubmit={handleLobbyJoin}>
+                <div className="gr-trader-lobby__join-fields">
+                  <input
+                    type="text"
+                    className="gr-input gr-trader-lobby__code-input"
+                    placeholder="Code de la salle (ex : PANIC1)"
+                    value={joinCodeInput}
+                    onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
+                    autoComplete="off"
+                    spellCheck={false}
+                    required
+                  />
+                  <input
+                    type="text"
+                    className="gr-input gr-trader-lobby__nick-input"
+                    placeholder="Votre prénom ou pseudo"
+                    value={joinNicknameInput}
+                    onChange={(e) => setJoinNicknameInput(e.target.value)}
+                  />
+                  <button type="submit" className="gr-btn gr-btn--primary gr-trader-lobby__join-btn">
+                    🔑 Rejoindre
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
         {/* BARRE D'INDICATEUR DE STATUT */}
-        <div className="gr-sub-bar">
+        {!showTraderLobby && (
+          <div className="gr-sub-bar">
           <div className="gr-sub-bar__left">
             <span className="gr-live-indicator">
               <span className="gr-live-indicator__pulse" />
@@ -398,6 +719,31 @@ export default function GameRoomPage() {
             </span>
           </div>
           <div className="gr-sub-bar__right">
+            {!isMasterRole && (
+              <>
+                <button
+                  type="button"
+                  className="gr-btn gr-btn--secondary"
+                  onClick={handleOpenLobby}
+                >
+                  🏛 Toutes les salles
+                </button>
+                <button
+                  type="button"
+                  className="gr-btn gr-btn--join"
+                  onClick={() => setShowJoinModal(true)}
+                >
+                  Rejoindre une autre salle 🔑
+                </button>
+                <button
+                  type="button"
+                  className="gr-btn gr-btn--create"
+                  onClick={() => setShowCreateModal(true)}
+                >
+                  + Créer une salle
+                </button>
+              </>
+            )}
             {isMasterRole && (
               <button
                 type="button"
@@ -407,15 +753,9 @@ export default function GameRoomPage() {
                 + Créer une salle
               </button>
             )}
-            <button
-              type="button"
-              className="gr-btn gr-btn--join"
-              onClick={() => setShowJoinModal(true)}
-            >
-              Rejoindre une autre salle 🔑
-            </button>
           </div>
         </div>
+        )}
 
         {/* SÉLECTEUR DE SALLE · MENEUR DE JEU */}
         {isMasterRole && (
@@ -595,6 +935,11 @@ export default function GameRoomPage() {
                ========================================================================= */}
             {isMaster && (
               <div className="gr-master-view">
+                {/* Portefeuille du propriétaire-trader : casquette maître ET trader */}
+                {!isMasterRole && (
+                  <GrPortfolio portfolio={portfolioData?.portfolio} currency={currency} />
+                )}
+
                 {/* Panneau de contrôle exclusif du Formateur avec Leaderboard */}
                 <GrMasterPanel
                   room={roomData.room}
@@ -609,7 +954,10 @@ export default function GameRoomPage() {
                   onSelectStudent={(id) => setSelectedStudentId(id)}
                 />
 
-                <LiveClassPanel roomId={roomData?.room?.id} />
+                {/* Suivi de classe : réservé au rôle enseignant (endpoint élève du rôle).
+                    Analyste et projection : accessibles aussi au trader-propriétaire,
+                    participant de sa propre salle. */}
+                {isMasterRole && <LiveClassPanel roomId={roomData?.room?.id} />}
                 <MarketAnalystPanel roomId={roomData?.room?.id} />
                 <ShockProjectionPanel roomId={roomData?.room?.id} />
 
@@ -625,7 +973,20 @@ export default function GameRoomPage() {
                       events={roomData.recentEvents}
                     />
 
-                    {/* SUPERVISION INDIVIDUELLE : Positions et Historique de chaque étudiant pour le Meneur de Jeu */}
+                    {/* Zone de trading du propriétaire-trader : ses positions et son historique */}
+                    {!isMasterRole && (
+                      <GrPositions
+                        positions={portfolioData?.positions}
+                        trades={portfolioData?.trades}
+                        currency={currency}
+                        onClosePosition={handleClosePosition}
+                        isClosing={isClosing}
+                      />
+                    )}
+
+                    {/* SUPERVISION INDIVIDUELLE : réservé au compte enseignant. Un trader
+                        propriétaire d'une salle personnelle n'a pas de classe à superviser. */}
+                    {isMasterRole && (
                     <div className="gr-master-student-details">
                       <div className="gr-inspector-bar">
                         <div className="gr-inspector-bar__info">
@@ -666,8 +1027,33 @@ export default function GameRoomPage() {
                         }
                       />
                     </div>
+                    )}
                   </div>
                   <div className="gr-main-grid__side-col">
+                    {/* Ordre du propriétaire-trader : il pilote la salle ET trade dedans */}
+                    {!isMasterRole && (
+                      <GrTradePanel
+                        symbol={symbol}
+                        unit={assetUnitShort(symbol)}
+                        currency={currency}
+                        decimals={assetDecimals(symbol)}
+                        assets={room?.assets}
+                        leverage={room?.leverage}
+                        commissionPercent={room?.commissionPercent}
+                        allowShortSelling={room?.allowShortSelling}
+                        riskLimitPercent={room?.riskLimitPercent}
+                        maxExposure={room?.maxExposure}
+                        marketPrice={roomData.market?.price}
+                        cash={portfolioData?.portfolio?.cash}
+                        heldQuantity={currentHeld}
+                        selectedPrice={selectedBookPrice}
+                        selectedSide={selectedBookSide}
+                        onSelectSymbol={handleChangeSymbol}
+                        onSubmitOrder={handlePlaceOrder}
+                        isSubmitting={isSubmitting}
+                      />
+                    )}
+
                     <GrOrderBook
                       book={roomData.book}
                       symbol={symbol}
@@ -732,14 +1118,68 @@ export default function GameRoomPage() {
                     Rejoindre la salle
                   </button>
                 </div>
+                <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
+                  {!isMasterRole && (
+                    <button
+                      type="button"
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#3fd1a0',
+                        textDecoration: 'underline',
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                        padding: '4px 8px',
+                      }}
+                      onClick={handleOpenLobby}
+                    >
+                      🏛 Voir toutes les salles de simulation disponibles
+                    </button>
+                  )}
+                  {!isMasterRole && (
+                    <button
+                      type="button"
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#3fd1a0',
+                        textDecoration: 'underline',
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                        padding: '4px 8px',
+                      }}
+                      onClick={() => {
+                        setShowJoinModal(false);
+                        setShowCreateModal(true);
+                      }}
+                    >
+                      ➕ Créer ma salle personnelle (vous en serez le meneur de jeu)
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#9aa3b6',
+                      textDecoration: 'underline',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      padding: '4px 8px',
+                    }}
+                    onClick={handleResetToDemoRoom}
+                  >
+                    Revenir à la salle de démonstration (« Le mardi de la panique »)
+                  </button>
+                </div>
               </form>
             </div>
           </div>
         )}
 
-        {/* Coach IA : uniquement pour les étudiants (traders), pas pour le Meneur de Jeu.
-            On lui donne la salle active : il répond sur les ordres de cet étudiant dans cette salle. */}
-        {!isMaster && <CoachWidget sessionId={roomData?.room?.id} />}
+        {/* Coach IA : pour les étudiants et pour le trader-propriétaire de sa salle
+            personnelle (il y participe), jamais pour le compte enseignant. */}
+        {!isMasterRole && <CoachWidget sessionId={roomData?.room?.id} />}
       </div>
     </ModuleShell>
   );

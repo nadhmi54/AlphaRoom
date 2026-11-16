@@ -17,7 +17,7 @@ import { gaussian, hashSeed, seededRandom } from './montecarlo.js';
  * données jusqu'à la minute actuelle : aucun prix du futur n'est utilisé.
  */
 
-export const SHOCK_EVENT_TYPES = ['price_shock', 'volatility_shock', 'whale'] as const;
+export const SHOCK_EVENT_TYPES = ['price_shock', 'volatility_shock', 'whale', 'spread_shock', 'liquidity_shock'] as const;
 export const MAX_HORIZON_MINUTES = 10;
 export const PROJECTION_PATHS = 2000;
 /** Un choc plus ancien que cela n'est plus « récent » : la projection reste disponible mais n'est plus mise en avant. */
@@ -92,12 +92,17 @@ export const PROJECTION_WARNING =
 
 const pctOf = (fraction: number) => round(fraction * 100, 2);
 
+/** Tous les chocs de marché (prix, volatilité, spread, liquidité, baleine) déjà survenus. */
+export function allShocks(session: SessionData, now?: number): SimEvent[] {
+  const maxMinute = now !== undefined ? now : Math.max(currentMinute(session), ...(session.events?.map((e) => e.minute) ?? [0]));
+  return (session.events ?? [])
+    .filter((e) => (SHOCK_EVENT_TYPES as readonly string[]).includes(e.type) && e.minute <= maxMinute + 0.05)
+    .sort((a, b) => a.minute - b.minute);
+}
+
 /** Dernier choc de marché (prix, volatilité, grosse transaction) déjà survenu. */
-export function latestShock(session: SessionData, now = currentMinute(session)): SimEvent | undefined {
-  return session.events
-    .filter((e) => (SHOCK_EVENT_TYPES as readonly string[]).includes(e.type) && e.minute <= now)
-    .sort((a, b) => a.minute - b.minute || a.id.localeCompare(b.id))
-    .at(-1);
+export function latestShock(session: SessionData, now?: number): SimEvent | undefined {
+  return allShocks(session, now).at(-1);
 }
 
 /** Rendements logarithmiques minute par minute entre deux minutes (incluses). */
@@ -121,6 +126,7 @@ function stdDev(values: number[]): number | null {
 const quantile = (sorted: number[], q: number) => sorted[Math.min(sorted.length - 1, Math.max(0, Math.floor(q * (sorted.length - 1))))]!;
 
 export interface ProjectionOptions {
+  shockId?: string;
   participantId?: string;
   /** Actif visé ; sinon celui que le choc a le plus déplacé. */
   symbol?: string;
@@ -131,18 +137,22 @@ export interface ProjectionOptions {
 }
 
 export function projectAfterShock(session: SessionData, options: ProjectionOptions = {}): ShockProjection | null {
-  const now = currentMinute(session);
-  const shock = latestShock(session, now);
+  const shocks = allShocks(session);
+  if (shocks.length === 0) return null;
+  const shock = options.shockId ? (shocks.find((s) => s.id === options.shockId) ?? shocks.at(-1)!) : shocks.at(-1)!;
   if (!shock) return null;
+
+  const now = Math.max(shock.minute, currentMinute(session));
   const remaining = session.durationMinutes - now;
   if (remaining <= 0) return null;
   const horizon = Math.max(1, Math.min(Math.trunc(options.horizon ?? MAX_HORIZON_MINUTES), MAX_HORIZON_MINUTES, remaining));
 
   // Actif : celui demandé, sinon celui que le choc a le plus déplacé.
-  const afterMinute = Math.min(now, shock.minute + 1);
+  const afterMinute = Math.min(now, Math.ceil(shock.minute) + 1);
+  const beforeMinute = Math.max(0, Math.floor(shock.minute) - 1);
   const moveOf = (symbol: string) => {
-    const before = priceAt(session.prices, symbol, Math.max(0, shock.minute - 1));
-    const after = priceAt(session.prices, symbol, afterMinute);
+    const before = priceAt(session.prices, symbol, beforeMinute) ?? priceAt(session.prices, symbol, 0);
+    const after = priceAt(session.prices, symbol, afterMinute) ?? before;
     return before !== undefined && after !== undefined && before > 0 ? { before, after, move: after / before - 1 } : null;
   };
   const candidates = (options.symbol && session.symbols.includes(options.symbol) ? [options.symbol] : session.symbols)
@@ -151,7 +161,7 @@ export function projectAfterShock(session: SessionData, options: ProjectionOptio
   if (candidates.length === 0) return null;
   const chosen = [...candidates].sort((a, b) => Math.abs(b.move) - Math.abs(a.move))[0]!;
   const { symbol, before, after, move } = chosen;
-  const current = priceAt(session.prices, symbol, now);
+  const current = priceAt(session.prices, symbol, now) ?? after;
   if (current === undefined || current <= 0) return null;
 
   // Volatilité : avant le choc, après le choc, puis valeur de départ de la simulation.
@@ -242,13 +252,13 @@ export function projectAfterShock(session: SessionData, options: ProjectionOptio
     actif: symbol,
     choc: {
       id: shock.id,
-      minute: shock.minute,
+      minute: round(shock.minute, 2),
       type: shock.type,
       titre: shock.label.replace(/[\r\n<>]/g, ' ').trim().slice(0, 140),
       prix_avant: roundPrice(before),
       prix_apres: roundPrice(after),
       variation_pct: pctOf(move),
-      minutes_ecoulees: now - shock.minute,
+      minutes_ecoulees: round(now - shock.minute, 1),
       recent: now - shock.minute <= RECENT_SHOCK_MINUTES,
     },
     minute_actuelle: now,
@@ -259,8 +269,8 @@ export function projectAfterShock(session: SessionData, options: ProjectionOptio
       apres_choc_par_minute_pct: sigmaAfter === null ? null : pctOf(sigmaAfter),
       utilisee_au_depart_par_minute_pct: pctOf(sigmaStart),
     },
-    historique: Array.from({ length: now - Math.max(0, shock.minute - 4) + 1 }, (_, i) => {
-      const minute = Math.max(0, shock.minute - 4) + i;
+    historique: Array.from({ length: Math.max(1, Math.round(now) - Math.max(0, Math.floor(shock.minute) - 4) + 1) }, (_, i) => {
+      const minute = Math.max(0, Math.floor(shock.minute) - 4) + i;
       return { minute, prix: roundPrice(priceAt(session.prices, symbol, minute) ?? current) };
     }),
     eventail,

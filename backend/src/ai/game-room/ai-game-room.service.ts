@@ -3,7 +3,7 @@ import type { Profile } from '../../users/profile.entity.js';
 import { AiAnalysisService } from '../analysis/ai-analysis.service.js';
 import { AiCoachService } from '../coach/ai-coach.service.js';
 import { SESSION_DATA_PROVIDER, type SessionDataProvider } from '../contract/session-data-provider.js';
-import { describeProjection, projectAfterShock } from '../market/shock-projection.js';
+import { allShocks, describeProjection, projectAfterShock } from '../market/shock-projection.js';
 import { isTeacher, listVisibleSessions, loadSession } from '../sessions/session-access.js';
 import { AiReportsService } from '../storage/ai-reports.service.js';
 
@@ -33,16 +33,32 @@ export class AiGameRoomService {
    * Projection après choc : éventail de trajectoires et scénarios, calculés par le code à partir de la série de la salle.
    * Pas une prévision. Sans choc récent, `projection` vaut null. L'étudiant voit sa propre position ; l'enseignant, le marché seul.
    */
-  async shock(profile: Profile, roomId: string) {
+  async shock(profile: Profile, roomId: string, shockId?: string) {
     const run = await this.latestRun(profile, roomId);
     const session = await loadSession(this.sessions, roomId, run);
     const participant = session.participants.some((p) => p.id === profile.id);
     if (!participant && !isTeacher(profile)) throw new NotFoundException('Tu ne participes pas à cette séance.');
-    const projection = projectAfterShock(session, participant ? { participantId: profile.id } : {});
+
+    const shocks = allShocks(session);
+    const targetShock = shockId ? (shocks.find((s) => s.id === shockId) ?? shocks.at(-1)) : shocks.at(-1);
+    const projection = targetShock
+      ? projectAfterShock(session, {
+          participantId: participant ? profile.id : undefined,
+          shockId: targetShock.id,
+        })
+      : null;
+
     return {
       role: 'AI Shock Projection',
       sessionId: roomId,
       run,
+      shocks: shocks.map((s) => ({
+        id: s.id,
+        minute: s.minute,
+        type: s.type,
+        label: s.label,
+      })),
+      selectedShockId: targetShock?.id ?? null,
       projection,
       text: projection ? describeProjection(projection) : null,
     };

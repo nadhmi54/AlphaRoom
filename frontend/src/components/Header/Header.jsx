@@ -88,8 +88,8 @@ export default function Header() {
 
             <div className="ar-hero__stats">
               <div className="ar-hero__stat">
-                <span className="ar-num">5</span>
-                <span className="ar-hero__stat-label">Classes d&apos;actifs</span>
+                <span className="ar-num">4</span>
+                <span className="ar-hero__stat-label">Grands marchés</span>
               </div>
               <div className="ar-hero__divider" />
               <div className="ar-hero__stat">
