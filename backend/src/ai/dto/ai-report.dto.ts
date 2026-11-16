@@ -30,6 +30,11 @@ export class ReportsQueryDto {
   @Type(() => Number) @IsInt() @Min(1) @Max(99) run!: number;
 }
 
+export class ProgressQueryDto {
+  /** Réservé à l'enseignant ; un étudiant obtient toujours sa propre progression. */
+  @IsOptional() @IsString() @MaxLength(100) participantId?: string;
+}
+
 export class UsageQueryDto {
   @IsOptional() @IsString() @MaxLength(100) sessionId?: string;
 }

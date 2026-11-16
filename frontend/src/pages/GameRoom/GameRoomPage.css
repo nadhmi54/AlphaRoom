@@ -1729,3 +1729,167 @@
   font: 500 11px "JetBrains Mono", monospace;
   color: #818b9e;
 }
+
+/* ==========================================================================
+   REFONTE UI — surfaces unifiées, titres dorés, hiérarchie des chiffres.
+   (Apparence uniquement : aucune règle de mise en page structurelle changée.)
+   ========================================================================== */
+.gr-page {
+  gap: 22px;
+}
+
+.gr-eyebrow {
+  color: var(--ar-accent);
+  letter-spacing: 0.16em;
+}
+
+.gr-header,
+.gr-portfolio-hero,
+.gr-chart-card,
+.gr-book-card,
+.gr-trade-card,
+.gr-table-card {
+  position: relative;
+  border: 1px solid var(--ar-line);
+  border-radius: var(--ar-radius-lg);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012)),
+    var(--ar-bg-1);
+  box-shadow: var(--ar-shadow-1);
+}
+
+/* filet doré en haut des grandes cartes */
+.gr-header::before,
+.gr-portfolio-hero::before,
+.gr-chart-card::before,
+.gr-trade-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 24px;
+  right: 24px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--ar-accent-line), transparent);
+  pointer-events: none;
+}
+
+.gr-header {
+  background:
+    radial-gradient(60% 120% at 100% 0%, rgba(217, 184, 119, 0.1), transparent 60%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012)),
+    var(--ar-bg-1);
+}
+
+.gr-header h2,
+.gr-header__title {
+  letter-spacing: -0.6px;
+}
+
+.gr-price {
+  font-size: 34px;
+}
+
+.gr-stat-card {
+  padding: 16px;
+  border-radius: var(--ar-radius);
+  background: rgba(255, 255, 255, 0.028);
+  border: 1px solid var(--ar-line);
+  transition:
+    border-color var(--ar-fast) ease,
+    background var(--ar-fast) ease;
+}
+
+.gr-stat-card:hover {
+  border-color: var(--ar-line-strong);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.gr-stat-card--primary {
+  background: linear-gradient(135deg, rgba(217, 184, 119, 0.14), rgba(217, 184, 119, 0.03));
+  border-color: var(--ar-accent-line);
+}
+
+.gr-stat-label {
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  color: var(--ar-text-dim);
+}
+
+.gr-stat-value {
+  font-size: 22px;
+  letter-spacing: -0.4px;
+}
+
+.gr-chart-card__head h3,
+.gr-book-card__head h4,
+.gr-trade-card__head h4 {
+  font-size: 17px;
+  letter-spacing: -0.2px;
+}
+
+.gr-toggle-btn,
+.gr-pill-btn,
+.gr-presets button {
+  transition:
+    background var(--ar-fast) ease,
+    border-color var(--ar-fast) ease,
+    color var(--ar-fast) ease;
+}
+
+.gr-submit-btn {
+  padding: 14px;
+  border-radius: var(--ar-radius);
+  letter-spacing: 0.01em;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.35);
+}
+
+.gr-submit-btn--buy {
+  box-shadow: 0 10px 28px rgba(63, 209, 160, 0.25);
+}
+
+.gr-submit-btn--sell {
+  box-shadow: 0 10px 28px rgba(255, 107, 122, 0.22);
+}
+
+.gr-summary-box {
+  border-radius: var(--ar-radius);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--ar-line);
+}
+
+.gr-empty-state {
+  margin: 8px 0 4px;
+  padding: 34px 20px;
+  border: 1px dashed var(--ar-line-strong);
+  border-radius: var(--ar-radius);
+  background: radial-gradient(60% 90% at 50% 0%, rgba(217, 184, 119, 0.06), transparent 70%);
+  color: var(--ar-text-dim);
+  line-height: 1.5;
+}
+
+.gr-table th {
+  letter-spacing: 0.08em;
+}
+
+.gr-table tbody tr {
+  transition: background var(--ar-fast) ease;
+}
+
+.gr-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.gr-master-panel {
+  border-radius: var(--ar-radius-lg);
+  border-color: var(--ar-accent-line);
+  box-shadow: var(--ar-glow-gold);
+}
+
+@media (max-width: 980px) {
+  .gr-portfolio-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .gr-main-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

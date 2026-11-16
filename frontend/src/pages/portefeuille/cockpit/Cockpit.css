@@ -283,3 +283,26 @@
   .ck-toasts { right: 12px; left: 12px; bottom: 12px; width: auto; }
   .ck-ticker-item { padding: 9px 16px; }
 }
+
+/* ---- Refonte UI ---- */
+.ck-hero {
+  position: relative;
+  border-color: var(--ar-accent-line);
+  border-radius: var(--ar-radius-lg);
+  background:
+    radial-gradient(70% 140% at 0% 0%, rgba(217, 184, 119, 0.12), transparent 60%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01)),
+    var(--ar-bg-1);
+  box-shadow: var(--ar-glow-gold);
+}
+.ck-eyebrow {
+  letter-spacing: 0.16em;
+}
+.ck-tabs {
+  border-color: var(--ar-line);
+  background: var(--ar-bg-1);
+}
+.ck-hero-stats > div {
+  border-color: var(--ar-line);
+  background: rgba(255, 255, 255, 0.03);
+}

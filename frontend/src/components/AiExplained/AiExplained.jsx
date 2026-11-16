@@ -1,4 +1,5 @@
 import { AI_EXAMPLE, AI_PRINCIPLES, AI_STEPS } from '../../data/aiExplained.js';
+import { PrincipleArt } from '../Art/Art.jsx';
 import './AiExplained.css';
 
 const MAX_WEIGHT = Math.max(...AI_EXAMPLE.factors.map((f) => Math.abs(f.weight)));
@@ -121,13 +122,7 @@ export default function AiExplained() {
               className="ar-ai-principle"
               style={{ '--principle-accent': item.accent }}
             >
-              <img
-                className="ar-ai-principle__img"
-                src={item.image}
-                alt={item.imageAlt}
-                loading="lazy"
-                style={{ objectPosition: item.position }}
-              />
+              <PrincipleArt id={item.id} color={item.accent} className="ar-ai-principle__img" />
               <div className="ar-ai-principle__content">
                 <span className="ar-ai-principle__num" aria-hidden="true">
                   0{index + 1}
